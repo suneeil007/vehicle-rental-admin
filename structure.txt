@@ -1,0 +1,272 @@
+src/
+│
+├── app/
+│   ├── config/
+│   ├── layouts/
+│   ├── providers/
+│   ├── router/
+│   ├── services/
+│   └── store/
+│
+├── modules/
+│   ├── auth/
+│   │   ├── api/
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   ├── pages/
+│   │   ├── routes/
+│   │   ├── store/
+│   │   └── validation/
+│   │
+│   ├── dashboard/
+│   ├── users/
+│   ├── roles/
+│   ├── branches/
+│   ├── vehicles/
+│   ├── bookings/
+│   ├── trips/
+│   ├── payments/
+│   └── invoices/
+│
+├── shared/
+│   ├── components/
+│   ├── layouts/
+│   ├── ui/
+│   ├── hooks/
+│   ├── utils/
+│   └── constants/
+│
+├── assets/
+│
+├── App.jsx
+├── main.jsx
+└── index.css
+
+
+nt! 🎉 Now the authentication flow is working:
+
+✅ Login
+✅ Token stored
+✅ User stored
+✅ Protected routes
+✅ Dashboard page accessible
+
+At this point, do not jump into Vehicles yet. Every admin panel needs a proper shell first.
+
+Phase 3 — Admin Layout
+
+We'll build this once, and every module will use it.
+
+ ---------------------------------------------------------
+| Logo             | Header                              |
+|                  |-------------------------------------|
+| Dashboard        | Breadcrumb                          |
+| Vehicles         |-------------------------------------|
+| Bookings         |                                     |
+| Trips            |        Page Content                 |
+| Payments         |                                     |
+| Invoices         |                                     |
+| Users            |                                     |
+| Branches         |                                     |
+| Roles            |                                     |
+| Logout           |                                     |
+ ---------------------------------------------------------
+Folder structure
+
+Inside shared:
+
+shared/
+
+components/
+
+    Sidebar/
+        Sidebar.jsx
+
+    Header/
+        Header.jsx
+
+    Breadcrumb/
+        Breadcrumb.jsx
+
+layouts/
+
+    DashboardLayout.jsx
+Then update DashboardLayout
+
+Instead of
+
+{children}
+
+it becomes
+
+<Sidebar />
+
+<div className="flex-1">
+
+    <Header />
+
+    <Breadcrumb />
+
+    <main>
+
+        {children}
+
+    </main>
+
+</div>
+Sidebar Menu
+
+Since your Laravel backend already has modules, your sidebar should mirror them.
+
+Dashboard
+
+Vehicle Management
+    Vehicles
+    Categories
+
+Booking Management
+    Bookings
+    Trips
+
+Finance
+    Payments
+    Invoices
+
+Administration
+    Users
+    Roles
+    Branches
+
+Logout
+
+This structure matches your backend modules.
+
+Then Routing
+
+Your router will evolve into something like:
+
+/
+
+Dashboard
+
+/vehicles
+
+/vehicle-categories
+
+/bookings
+
+/trips
+
+/payments
+
+/invoices
+
+/users
+
+/roles
+
+/branches
+
+Each page can initially be a simple placeholder like:
+
+const VehiclePage = () => {
+    return <h1>Vehicles</h1>;
+};
+
+We'll connect them to the APIs afterward.
+
+Auth Module Roadmap
+Auth
+│
+├── ✅ Login (Done)
+├── Register
+├── Logout
+├── Auto Login (Token Check)
+├── User Profile
+├── Update Profile
+├── Change Password
+└── Forgot Password (Later)
+Phase 1 (Current)
+✅ Login
+
+Completed.
+
+Login API
+Zustand
+Token Storage
+Protected Route
+
+
+src/
+│
+├── shared/
+│   ├── components/
+│   │   ├── Header/
+│   │   ├── Sidebar/
+│   │   └── PageHeader.jsx
+│   │
+│   ├── ui/
+│   │   ├── Table/
+│   │   │   ├── DataTable.jsx
+│   │   │   ├── TableHeader.jsx
+│   │   │   ├── TableRow.jsx
+│   │   │   └── TableCell.jsx
+│   │   │
+│   │   ├── Button.jsx
+│   │   ├── Input.jsx
+│   │   ├── Modal.jsx
+│   │   ├── Pagination.jsx
+│   │   ├── Loader.jsx
+│   │   └── EmptyState.jsx
+│   │
+│   └── utils/
+│
+├── modules/
+│   ├── users/
+│   ├── vehicles/
+│   ├── bookings/
+│   └── ...
+
+
+
+We will build:
+
+users
+│
+├── api
+│   └── userApi.js        ✅ already
+│
+├── hooks
+│   ├── useUsers.js       ✅ already
+│   └── useCreateUser.js  ➕ new
+│
+├── pages
+│   └── CreateUserPage.jsx ➕ new
+│
+├── components
+│   └── UserForm.jsx      ➕ new
+│
+└── validation
+    └── userSchema.js     ➕ new
+
+Flow:
+
+Add User Button
+        |
+        ↓
+Create User Page
+        |
+        ↓
+React Hook Form
+        |
+        ↓
+Zod Validation
+        |
+        ↓
+POST /api/users
+        |
+        ↓
+Invalidate users query
+        |
+        ↓
+Back to User List

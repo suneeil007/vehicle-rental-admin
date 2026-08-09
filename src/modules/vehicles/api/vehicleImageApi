@@ -1,0 +1,7 @@
+import api from "@/app/services/api";
+
+export const setFeaturedImage = (imageId) => {
+    return api.patch(`/vehicle-images/${imageId}`, {
+        is_featured: true,
+    });
+};

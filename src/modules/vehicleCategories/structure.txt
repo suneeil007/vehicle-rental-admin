@@ -1,0 +1,66 @@
+vehicle-categories/
+│
+├── api/
+│   vehicleCategoryApi.js
+│
+├── components/
+│   VehicleCategoryForm.jsx
+│   VehicleCategoryTable.jsx
+│   DeleteVehicleCategoryDialog.jsx
+│
+├── hooks/
+│   useVehicleCategories.js
+│   useVehicleCategory.js
+│   useCreateVehicleCategory.js
+│   useUpdateVehicleCategory.js
+│   useDeleteVehicleCategory.js
+│
+├── pages/
+│   VehicleCategoryListPage.jsx
+│   VehicleCategoryCreatePage.jsx
+│   VehicleCategoryEditPage.jsx
+│
+├── services/
+│   vehicleCategoryService.js
+│
+└── validation/
+    vehicleCategorySchema.js
+
+
+    vehicleCategories
+│
+├── api
+│   └── vehicleCategoryApi.js
+│
+├── hooks
+│   ├── useVehicleCategories.js
+│   ├── useVehicleCategory.js
+│   ├── useCreateVehicleCategory.js
+│   ├── useUpdateVehicleCategory.js
+│   └── useDeleteVehicleCategory.js
+│
+├── components
+├── pages
+├── validation
+└── vehicleCategoryRoutes.jsx
+
+You can then safely delete:
+
+services/
+    vehicleCategoryService.js
+
+since it is no longer needed.
+
+
+PROJECT CODE FLOW+++
++++++++++++++++++++++++
+
+Page
+   ↓
+Hook
+   ↓
+API
+   ↓
+Axios
+   ↓
+Laravel API
