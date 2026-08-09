@@ -1,103 +1,75 @@
-import { NavLink } from "react-router-dom";
-import { useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 
 import {
-    ChevronDown,
     ChevronRight,
-    LayoutDashboard,
-    Car,
-    CalendarDays,
-    Users,
-    Wallet,
-    Building2,
+    PanelLeftClose,
+    PanelLeftOpen,
 } from "lucide-react";
 
-const menus = [
-    {
-        title: "Dashboard",
-        icon: LayoutDashboard,
-        path: "/",
-    },
+import { menus } from "./sidebarMenus";
 
-    {
-        title: "Vehicle Management",
-        icon: Car,
-        children: [
-            {
-                title: "Vehicle Categories",
-                path: "/vehicle-categories",
-            },
-            {
-                title: "Vehicles",
-                path: "/vehicles",
-            },
-        ],
-    },
+const Sidebar = ({ collapsed, setCollapsed }) => {
+    const location = useLocation();
 
-    {
-        title: "Booking Management",
-        icon: CalendarDays,
-        children: [
-            {
-                title: "Bookings",
-                path: "/bookings",
-            },
-            {
-                title: "Trips",
-                path: "/trips",
-            },
-        ],
-    },
+    const [openMenus, setOpenMenus] = useState({});
 
-    {
-        title: "User Management",
-        icon: Users,
-        children: [
-            {
-                title: "Users",
-                path: "/users",
-            },
-            {
-                title: "Roles",
-                path: "/roles",
-            },
-        ],
-    },
+    /*
+    |--------------------------------------------------------------------------
+    | Automatically handle active dropdown
+    |--------------------------------------------------------------------------
+    |
+    | Example:
+    | /vehicle-categories
+    |      ↓
+    | Vehicle Management automatically opens
+    |
+    | Then:
+    | /
+    |      ↓
+    | Vehicle Management automatically closes
+    |
+    */
 
-    {
-        title: "Finance",
-        icon: Wallet,
-        children: [
-            {
-                title: "Payments",
-                path: "/payments",
-            },
-            {
-                title: "Invoices",
-                path: "/invoices",
-            },
-        ],
-    },
+    useEffect(() => {
+        const activeParent = menus.find(
+            (menu) =>
+                menu.children &&
+                menu.children.some(
+                    (child) =>
+                        location.pathname === child.path ||
+                        location.pathname.startsWith(
+                            `${child.path}/`
+                        )
+                )
+        );
 
-    {
-        title: "Branch Management",
-        icon: Building2,
-        children: [
-            {
-                title: "Branches",
-                path: "/branches",
-            },
-        ],
-    },
-];
+        if (activeParent) {
+            setOpenMenus({
+                [activeParent.title]: true,
+            });
+        } else {
+            setOpenMenus({});
+        }
+    }, [location.pathname]);
 
-const Sidebar = () => {
-
-    const [openMenus, setOpenMenus] = useState({
-        "Vehicle Management": false,
-    });
+    /*
+    |--------------------------------------------------------------------------
+    | Toggle dropdown
+    |--------------------------------------------------------------------------
+    */
 
     const toggleMenu = (title) => {
+        if (collapsed) {
+            setCollapsed(false);
+
+            setOpenMenus({
+                [title]: true,
+            });
+
+            return;
+        }
+
         setOpenMenus((prev) => ({
             ...prev,
             [title]: !prev[title],
@@ -105,153 +77,533 @@ const Sidebar = () => {
     };
 
     return (
-        <aside className="w-72 min-h-screen bg-slate-900 text-white shadow-lg">
+        <aside
+            className={`
+                fixed
+                left-0
+                top-0
+                z-50
+                h-screen
+                bg-slate-900
+                text-white
+                shadow-xl
+                flex
+                flex-col
+                transition-all
+                duration-300
+                ease-in-out
 
-            <div className="p-6 border-b border-slate-700">
+                ${collapsed ? "w-20" : "w-72"}
+            `}
+        >
+            {/* =====================================================
+                HEADER
+            ====================================================== */}
 
-                <h2 className="text-2xl font-bold">
-                    Vehicle Rental
-                </h2>
+            <div
+                className={`
+                    h-16
+                    flex
+                    items-center
+                    border-b
+                    border-slate-700
+                    transition-all
+                    duration-300
 
+                    ${
+                        collapsed
+                            ? "justify-center px-3"
+                            : "justify-between px-4"
+                    }
+                `}
+            >
+                {!collapsed && (
+                    <div
+                        className="
+                            overflow-hidden
+                            whitespace-nowrap
+                            transition-all
+                            duration-300
+                        "
+                    >
+                        <h2 className="text-lg font-bold tracking-wide">
+                            Vehicle Rental
+                        </h2>
+
+                        <p className="text-xs text-slate-400 mt-0.5">
+                            Administration
+                        </p>
+                    </div>
+                )}
+
+                <button
+                    type="button"
+                    onClick={() =>
+                        setCollapsed((prev) => !prev)
+                    }
+                    className="
+                        flex
+                        h-10
+                        w-10
+                        items-center
+                        justify-center
+                        rounded-lg
+                        text-slate-300
+                        hover:bg-slate-800
+                        hover:text-white
+                        transition-all
+                        duration-200
+                        cursor-pointer
+                    "
+                    aria-label={
+                        collapsed
+                            ? "Expand sidebar"
+                            : "Collapse sidebar"
+                    }
+                >
+                    {collapsed ? (
+                        <PanelLeftOpen size={21} />
+                    ) : (
+                        <PanelLeftClose size={21} />
+                    )}
+                </button>
             </div>
 
-            <nav className="p-4 space-y-2">
+            {/* =====================================================
+                NAVIGATION
+            ====================================================== */}
 
+            <nav
+                className="
+                    flex-1
+                    overflow-y-auto
+                    overflow-x-hidden
+                    p-3
+                    text-sm
+                    space-y-1
+                "
+            >
                 {menus.map((menu) => {
+                    const Icon = menu.icon;
 
-                    // Normal menu
+                    /*
+                    |--------------------------------------------------------------------------
+                    | NORMAL MENU
+                    |--------------------------------------------------------------------------
+                    */
+
                     if (!menu.children) {
-
-                        const Icon = menu.icon;
-
                         return (
-
                             <NavLink
                                 key={menu.path}
                                 to={menu.path}
                                 end
+                                title={
+                                    collapsed
+                                        ? menu.title
+                                        : undefined
+                                }
                                 className={({ isActive }) =>
-                                    `flex items-center gap-3 px-4 py-3 rounded-lg transition-all
+                                    `
+                                    group
+                                    relative
+                                    flex
+                                    items-center
+                                    h-11
+                                    rounded-lg
+                                    transition-all
+                                    duration-200
+                                    text-sm
+                                    cursor-pointer
+
+                                    ${
+                                        collapsed
+                                            ? "justify-center px-0"
+                                            : "gap-3 px-3"
+                                    }
+
                                     ${
                                         isActive
-                                            ? "bg-blue-600 text-white"
-                                            : "hover:bg-slate-800 text-slate-200"
-                                    }`
+                                            ? "bg-blue-600 text-white shadow-md shadow-blue-900/30"
+                                            : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                                    }
+                                    `
                                 }
                             >
-
-                                <Icon size={18} />
-
-                                {menu.title}
-
-                            </NavLink>
-
-                        );
-
-                    }
-
-                    // Dropdown menu
-                    const Icon = menu.icon;
-
-                    return (
-
-                        <div key={menu.title}>
-
-                            <button
-                                onClick={() => toggleMenu(menu.title)}
-                                className="
-                                        w-full
-                                        flex
-                                        items-center
-                                        justify-between
-                                        px-4
-                                        py-3
-                                        rounded-lg
-                                        hover:bg-slate-800
-                                        transition-all
-                                        duration-200
-                                    "
-                            >
-
-                                <div className="flex items-center gap-3">
-
-                                    <Icon size={18} />
-
-                                    <span>{menu.title}</span>
-
-                                </div>
-
-                                <ChevronRight
-                                    size={18}
-                                    className={`
+                                <Icon
+                                    size={19}
+                                    className="
+                                        shrink-0
                                         transition-transform
-                                        duration-300
-                                        ${
-                                            openMenus[menu.title]
-                                                ? "rotate-90"
-                                                : ""
-                                        }
-                                    `}
+                                        duration-200
+                                        group-hover:scale-110
+                                    "
                                 />
 
-                            </button>
+                                <span
+                                    className={`
+                                        whitespace-nowrap
+                                        overflow-hidden
+                                        transition-all
+                                        duration-300
+                                        text-sm
 
-                            <div
+                                        ${
+                                            collapsed
+                                                ? "w-0 opacity-0"
+                                                : "w-auto opacity-100"
+                                        }
+                                    `}
+                                >
+                                    {menu.title}
+                                </span>
+
+                                {/* Tooltip */}
+
+                                {collapsed && (
+                                    <span
+                                        className="
+                                            pointer-events-none
+                                            absolute
+                                            left-16
+                                            z-50
+                                            whitespace-nowrap
+                                            rounded-md
+                                            bg-slate-800
+                                            px-3
+                                            py-2
+                                            text-xs
+                                            text-white
+                                            opacity-0
+                                            translate-x-[-5px]
+                                            shadow-lg
+                                            transition-all
+                                            duration-200
+                                            group-hover:opacity-100
+                                            group-hover:translate-x-0
+                                        "
+                                    >
+                                        {menu.title}
+                                    </span>
+                                )}
+                            </NavLink>
+                        );
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CHECK ACTIVE CHILD
+                    |--------------------------------------------------------------------------
+                    */
+
+                    const isParentActive =
+                        menu.children.some(
+                            (child) =>
+                                location.pathname ===
+                                    child.path ||
+                                location.pathname.startsWith(
+                                    `${child.path}/`
+                                )
+                        );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | DROPDOWN OPEN STATE
+                    |--------------------------------------------------------------------------
+                    */
+
+                    const isOpen =
+                        !collapsed &&
+                        openMenus[menu.title];
+
+                    return (
+                        <div key={menu.title}>
+                            {/* =================================================
+                                PARENT BUTTON
+                            ================================================== */}
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    toggleMenu(menu.title)
+                                }
+                                title={
+                                    collapsed
+                                        ? menu.title
+                                        : undefined
+                                }
                                 className={`
-                                    overflow-hidden
+                                    group
+                                    relative
+                                    w-full
+                                    flex
+                                    items-center
+                                    h-11
+                                    rounded-lg
                                     transition-all
-                                    duration-300
-                                    ease-in-out
+                                    duration-200
+                                    cursor-pointer
+
                                     ${
-                                        openMenus[menu.title]
-                                            ? "max-h-96 opacity-100 mt-2"
-                                            : "max-h-0 opacity-0"
+                                        collapsed
+                                            ? "justify-center px-0"
+                                            : "justify-between px-3"
+                                    }
+
+                                    ${
+                                        isParentActive
+                                            ? "bg-slate-800 text-white"
+                                            : "text-slate-300 hover:bg-slate-800 hover:text-white"
                                     }
                                 `}
                             >
-                                <div className="ml-10 space-y-1">
+                                <div
+                                    className={`
+                                        flex
+                                        items-center
 
-                                    {menu.children.map((child) => (
+                                        ${
+                                            collapsed
+                                                ? "justify-center"
+                                                : "gap-3"
+                                        }
+                                    `}
+                                >
+                                    <Icon
+                                        size={19}
+                                        className={`
+                                            shrink-0
+                                            transition-all
+                                            duration-200
+                                            group-hover:scale-110
 
-                                        <NavLink
-                                            key={child.path}
-                                            to={child.path}
-                                            className={({ isActive }) =>
-                                                `
-                                                flex
-                                                items-center
-                                                gap-2
-                                                px-3
-                                                py-2
-                                                rounded-md
-                                                text-sm
-                                                transition-all
-                                                duration-200
-                                                ${
-                                                    isActive
-                                                        ? "bg-blue-600 text-white"
-                                                        : "text-slate-300 hover:bg-slate-800 hover:translate-x-1"
-                                                }
-                                                `
+                                            ${
+                                                isParentActive
+                                                    ? "text-blue-400"
+                                                    : "text-slate-300"
                                             }
-                                        >
-                                            <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                                            {child.title}
-                                        </NavLink>
+                                        `}
+                                    />
 
-                                    ))}
+                                    <span
+                                        className={`
+                                            whitespace-nowrap
+                                            overflow-hidden
+                                            transition-all
+                                            duration-300
+                                            text-sm
 
+                                            ${
+                                                collapsed
+                                                    ? "w-0 opacity-0"
+                                                    : "w-auto opacity-100"
+                                            }
+                                        `}
+                                    >
+                                        {menu.title}
+                                    </span>
+                                </div>
+
+                                {!collapsed && (
+                                    <ChevronRight
+                                        size={17}
+                                        className={`
+                                            shrink-0
+                                            transition-all
+                                            duration-300
+
+                                            ${
+                                                isOpen
+                                                    ? "rotate-90 text-blue-400"
+                                                    : "text-slate-500"
+                                            }
+                                        `}
+                                    />
+                                )}
+
+                                {/* Tooltip */}
+
+                                {collapsed && (
+                                    <span
+                                        className="
+                                            pointer-events-none
+                                            absolute
+                                            left-16
+                                            z-50
+                                            whitespace-nowrap
+                                            rounded-md
+                                            bg-slate-800
+                                            px-3
+                                            py-2
+                                            text-xs
+                                            text-white
+                                            opacity-0
+                                            translate-x-[-5px]
+                                            shadow-lg
+                                            transition-all
+                                            duration-200
+                                            group-hover:opacity-100
+                                            group-hover:translate-x-0
+                                        "
+                                    >
+                                        {menu.title}
+                                    </span>
+                                )}
+                            </button>
+
+                            {/* =================================================
+                                CHILDREN
+                            ================================================== */}
+
+                            <div
+                                className={`
+                                    grid
+                                    transition-all
+                                    duration-300
+                                    ease-in-out
+
+                                    ${
+                                        isOpen
+                                            ? "grid-rows-[1fr] opacity-100"
+                                            : "grid-rows-[0fr] opacity-0"
+                                    }
+                                `}
+                            >
+                                <div className="overflow-hidden">
+                                    <div
+                                        className="
+                                            ml-5
+                                            mt-1
+                                            pl-4
+                                            border-l
+                                            border-slate-700
+                                            space-y-1
+                                        "
+                                    >
+                                        {menu.children.map(
+                                            (child) => (
+                                                <NavLink
+                                                    key={
+                                                        child.path
+                                                    }
+                                                    to={
+                                                        child.path
+                                                    }
+                                                    className={({
+                                                        isActive,
+                                                    }) =>
+                                                        `
+                                                        group
+                                                        relative
+                                                        flex
+                                                        items-center
+                                                        gap-2
+                                                        px-3
+                                                        py-2.5
+                                                        rounded-md
+                                                        text-sm
+                                                        transition-all
+                                                        duration-200
+
+                                                        ${
+                                                            isActive
+                                                                ? "bg-blue-600 text-white shadow-sm"
+                                                                : "text-slate-400 hover:bg-slate-800 hover:text-white hover:translate-x-1"
+                                                        }
+                                                        `
+                                                    }
+                                                >
+                                                    <span
+                                                        className={`
+                                                            w-1.5
+                                                            h-1.5
+                                                            rounded-full
+                                                            shrink-0
+                                                            transition-all
+                                                            duration-200
+
+                                                            ${
+                                                                location.pathname ===
+                                                                child.path
+                                                                    ? "bg-white scale-125"
+                                                                    : "bg-slate-500 group-hover:bg-white"
+                                                            }
+                                                        `}
+                                                    />
+
+                                                    <span className="truncate">
+                                                        {
+                                                            child.title
+                                                        }
+                                                    </span>
+                                                </NavLink>
+                                            )
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-
                         </div>
-
                     );
-
                 })}
-
             </nav>
 
+            {/* =====================================================
+                BOTTOM
+            ====================================================== */}
+
+            <div
+                className="
+                    border-t
+                    border-slate-700
+                    p-3
+                "
+            >
+                <div
+                    className={`
+                        flex
+                        items-center
+                        rounded-lg
+                        bg-slate-800
+                        transition-all
+                        duration-300
+
+                        ${
+                            collapsed
+                                ? "justify-center p-2"
+                                : "gap-3 p-3"
+                        }
+                    `}
+                >
+                    <div
+                        className="
+                            flex
+                            h-8
+                            w-8
+                            shrink-0
+                            items-center
+                            justify-center
+                            rounded-full
+                            bg-blue-600
+                            text-xs
+                            font-bold
+                        "
+                    >
+                        VR
+                    </div>
+
+                    {!collapsed && (
+                        <div className="overflow-hidden">
+                            <p className="text-sm font-medium whitespace-nowrap">
+                                Vehicle Rental
+                            </p>
+
+                            <p className="text-xs text-slate-400 whitespace-nowrap">
+                                Admin Panel
+                            </p>
+                        </div>
+                    )}
+                </div>
+            </div>
         </aside>
     );
 };

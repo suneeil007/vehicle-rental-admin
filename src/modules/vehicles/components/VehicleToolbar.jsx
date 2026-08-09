@@ -5,7 +5,7 @@ const VehicleToolbar = () => {
     const navigate = useNavigate();
 
     return (
-        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
 
                 <div className="flex items-center gap-4">
@@ -14,7 +14,7 @@ const VehicleToolbar = () => {
                     </div>
 
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">
+                        <h1 className="text-xl font-bold text-gray-600">
                             Vehicles
                         </h1>
 
