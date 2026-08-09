@@ -734,7 +734,7 @@ const UserForm = ({
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="px-5 py-2.5 rounded-lg border hover:bg-gray-50"
+                        className="px-5 py-2.5 rounded-lg border hover:bg-gray-50 cursor-pointer"
                     >
                         Cancel
                     </button>
@@ -750,8 +750,7 @@ const UserForm = ({
                             text-white
                             hover:bg-blue-700
                             disabled:opacity-50
-                            "
-                    >
+                            cursor-pointer">
                         {isSubmitting || isLoading
                             ? "Saving..."
                             : defaultValues

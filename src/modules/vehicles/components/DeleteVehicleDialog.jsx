@@ -33,7 +33,7 @@ const DeleteVehicleDialog = ({
                         Delete Vehicle
                     </AlertDialogTitle>
 
-                    <AlertDialogDescription className="text-center">
+                    <AlertDialogDescription className="text-left">
                         {vehicle ? (
                             <>
                                 Are you sure you want to delete
@@ -58,7 +58,10 @@ const DeleteVehicleDialog = ({
                 </AlertDialogHeader>
 
                 <AlertDialogFooter>
-                    <AlertDialogCancel disabled={loading}>
+                    <AlertDialogCancel
+                         disabled={loading}
+                         className="cursor-pointer"
+                         >
                         Cancel
                     </AlertDialogCancel>
 
@@ -68,7 +71,7 @@ const DeleteVehicleDialog = ({
                             onConfirm();
                         }}
                         disabled={loading}
-                        className="bg-red-600 hover:bg-red-700"
+                        className="bg-red-600 cursor-pointer hover:bg-red-700"
                     >
                         {loading ? "Deleting..." : "Delete"}
                     </AlertDialogAction>

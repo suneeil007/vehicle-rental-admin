@@ -515,7 +515,7 @@ const VehicleForm = ({
                 <button
                     type="button"
                     onClick={onCancel}
-                    className="px-5 py-2.5 rounded-lg border hover:bg-gray-50"
+                    className="px-5 py-2.5 rounded-lg border hover:bg-gray-50 cursor-pointer"
                 >
                     Cancel
                 </button>
@@ -523,7 +523,7 @@ const VehicleForm = ({
                 <button
                     type="submit"
                     disabled={isSubmitting || isLoading}
-                    className="px-5 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                    className="px-5 py-2.5 rounded-lg bg-blue-600 cursor-pointer text-white hover:bg-blue-700 disabled:opacity-50"
                 >
                     {isSubmitting || isLoading
                         ? "Saving..."

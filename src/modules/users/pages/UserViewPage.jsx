@@ -240,6 +240,7 @@ const UserViewPage = () => {
                             py-2.5
                             rounded-lg
                             border
+                            cursor-pointer
                             hover:bg-gray-50
                             ">
                         Back

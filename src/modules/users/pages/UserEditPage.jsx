@@ -23,7 +23,7 @@ const UserEditPage = () => {
 
     const handleUpdate = (formData) => {
         // console.log("Edited Data:", formData);
-        console.log("SUBMIT FIRED - DOB:", formData.profile?.date_of_birth);
+        // console.log("SUBMIT FIRED - DOB:", formData.profile?.date_of_birth);
         mutate(
             {
                 slug,
@@ -65,7 +65,7 @@ const UserEditPage = () => {
                 text-3xl
                 font-bold
                 mb-6
-            ">
+                cursor-pointer">
                 Edit User
             </h1>
             <UserForm

@@ -9,7 +9,7 @@ import {
     AlertDialogTitle
 } from "@/components/ui/alert-dialog";
 
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2, AlertTriangle } from "lucide-react";
 
 const DeleteVehicleCategoryDialog = ({
     open,
@@ -28,7 +28,7 @@ const DeleteVehicleCategoryDialog = ({
             <AlertDialogHeader>
 
                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
-                  <Trash2 className="h-7 w-7 text-red-600" />
+                  <AlertTriangle className="h-7 w-7 text-red-600" />
                </div>
 
                <AlertDialogTitle>
@@ -60,6 +60,7 @@ const DeleteVehicleCategoryDialog = ({
 
               <AlertDialogCancel
                 disabled={isDeleting}
+                className="cursor-pointer"
               >
                 Cancel
               </AlertDialogCancel>
@@ -73,8 +74,7 @@ const DeleteVehicleCategoryDialog = ({
                             bg-red-600
                             hover:bg-red-700
                             text-white
-                        "
-                    >
+                            cursor-pointer">
 
                         {isDeleting ? (
                             <>
