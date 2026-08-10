@@ -28,6 +28,7 @@ const VehicleCreatePage = () => {
             description: data.description,
             status: data.status,
             images: data.images,
+            featured_new_index: data.featured_new_index,
         });
 
         mutate(

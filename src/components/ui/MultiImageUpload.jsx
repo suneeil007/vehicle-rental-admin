@@ -7,6 +7,8 @@ const MultiImageUpload = ({
     existingImages = [],
     onRemoveExisting,
     onSetFeatured,
+    featuredNewIndex = null,
+    onSetNewFeatured,
     label = "Images",
     helperText,
     error,
@@ -24,6 +26,8 @@ const MultiImageUpload = ({
     const totalCount = existingImages.length + value.length;
     const canAddMore = totalCount < maxFiles;
     const isEmpty = totalCount === 0;
+
+    const hasAnyFeaturedExisting = existingImages.some((img) => img.is_featured);
 
     useEffect(() => {
         const urls = value.map((file) => URL.createObjectURL(file));
@@ -89,6 +93,14 @@ const MultiImageUpload = ({
 
     const removeNewImage = (index) => {
         onChange(value.filter((_, i) => i !== index));
+
+        if (onSetNewFeatured && featuredNewIndex !== null) {
+            if (featuredNewIndex === index) {
+                onSetNewFeatured(null);
+            } else if (featuredNewIndex > index) {
+                onSetNewFeatured(featuredNewIndex - 1);
+            }
+        }
     };
 
     const thumbStyle = {
@@ -242,46 +254,88 @@ const MultiImageUpload = ({
                     ))}
 
                     {/* New Images */}
-                    {value.map((file, index) => (
-                        <div
-                            key={index}
-                            style={thumbStyle}
-                            className="relative group rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm"
-                        >
-                            <img
-                                src={previews[index]}
-                                alt={file.name}
-                                className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
-                            />
+                    {value.map((file, index) => {
+                        const isThisFeatured = featuredNewIndex === index;
 
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    removeNewImage(index);
-                                }}
-                                className="
-                                    absolute
-                                    top-2
-                                    right-2
-                                    z-50
-                                    flex
-                                    items-center
-                                    justify-center
-                                    w-7
-                                    h-7
-                                    rounded-full
-                                    bg-red-600
-                                    text-white
-                                    shadow-lg
-                                    hover:bg-red-700
-                                    transition
-                                "
+                        return (
+                            <div
+                                key={index}
+                                style={thumbStyle}
+                                className="relative group rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm"
                             >
-                                <X size={15} />
-                            </button>
-                        </div>
-                    ))}
+                                <img
+                                    src={previews[index]}
+                                    alt={file.name}
+                                    className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
+                                />
+
+                                {onSetNewFeatured && !hasAnyFeaturedExisting && (
+                                    <button
+                                        type="button"
+                                        title={
+                                            isThisFeatured
+                                                ? "Featured image"
+                                                : "Set as featured image"
+                                        }
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onSetNewFeatured(
+                                                isThisFeatured ? null : index
+                                            );
+                                        }}
+                                        className={`
+                                            absolute
+                                            top-2
+                                            left-2
+                                            z-50
+                                            flex
+                                            items-center
+                                            justify-center
+                                            w-7
+                                            h-7
+                                            rounded-full
+                                            shadow-lg
+                                            transition
+                                            ${
+                                                isThisFeatured
+                                                    ? "bg-green-600 text-white opacity-100"
+                                                    : "bg-white/80 text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-green-600 hover:text-white"
+                                            }
+                                        `}
+                                    >
+                                        <Check size={15} />
+                                    </button>
+                                )}
+
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        removeNewImage(index);
+                                    }}
+                                    className="
+                                        absolute
+                                        top-2
+                                        right-2
+                                        z-50
+                                        flex
+                                        items-center
+                                        justify-center
+                                        w-7
+                                        h-7
+                                        rounded-full
+                                        bg-red-600
+                                        text-white
+                                        shadow-lg
+                                        hover:bg-red-700
+                                        transition
+                                    "
+                                >
+                                    <X size={15} />
+                                </button>
+                            </div>
+                        );
+                    })}
 
                     {/* Add More */}
                     {canAddMore && (

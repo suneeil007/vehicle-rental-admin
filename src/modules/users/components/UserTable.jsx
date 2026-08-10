@@ -86,6 +86,7 @@ const UserTable = ({
                     py-2
                     w-full
                     md:w-96
+                    bg-white
                     "/>
 
         <div className="
@@ -111,6 +112,7 @@ const UserTable = ({
                                     className="
                                         cursor-pointer
                                         font-semibold
+                                        bg-gray-100
                                         "
                                 >
 

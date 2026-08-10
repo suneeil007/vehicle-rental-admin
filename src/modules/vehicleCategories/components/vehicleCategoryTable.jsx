@@ -72,6 +72,7 @@ const VehicleCategoryTable = ({
                     px-4
                     py-2
                     w-full
+                    bg-white
                     md:w-96"/>
             <div
                 className="
@@ -96,6 +97,7 @@ const VehicleCategoryTable = ({
                                                     }
                                                     className="
                                                         cursor-pointer
+                                                        bg-gray-100
                                                         font-semibold">
                                                     <div className="flex gap-2">
                                                         {

@@ -60,6 +60,7 @@ const VehicleTable = ({
                     px-4
                     py-2
                     w-full
+                    bg-white
                     md:w-96"/>
 
             {/* Table */}
@@ -83,6 +84,7 @@ const VehicleTable = ({
                                         className="
                                             w-16
                                             text-center
+                                            bg-gray-100
                                             font-semibold">
                                         S.N.
                                     </TableHead>
@@ -95,6 +97,7 @@ const VehicleTable = ({
                                             }
                                             className="
                                                 cursor-pointer
+                                                bg-gray-100
                                                 font-semibold">
                                             <div className="flex items-center gap-2">
 

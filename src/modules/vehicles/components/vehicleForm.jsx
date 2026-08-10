@@ -72,6 +72,7 @@ const VehicleForm = ({
     const [newImages, setNewImages] = useState([]);
     const [existingImages, setExistingImages] = useState([]);
     const [removedImageIds, setRemovedImageIds] = useState([]);
+    const [featuredNewIndex, setFeaturedNewIndex] = useState(null);
 
     const {
         register,
@@ -155,6 +156,7 @@ const VehicleForm = ({
 
         setNewImages([]);
         setRemovedImageIds([]);
+        setFeaturedNewIndex(null);
 
         setExistingImages(
             (defaultValues.images ?? []).map((img) => ({
@@ -185,6 +187,7 @@ const VehicleForm = ({
             ...data,
             images: newImages,
             removed_image_ids: removedImageIds,
+            featured_new_index: featuredNewIndex,
         });
     };
 
@@ -505,6 +508,8 @@ const VehicleForm = ({
                             setRemovedImageIds((prev) => [...prev, id]);
                         }}
                         onSetFeatured={handleSetFeatured}
+                        featuredNewIndex={featuredNewIndex}
+                        onSetNewFeatured={setFeaturedNewIndex}
                         maxFiles={8}
                     />
                 </div>

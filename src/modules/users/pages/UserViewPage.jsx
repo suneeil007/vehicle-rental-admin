@@ -56,9 +56,9 @@ const UserViewPage = () => {
 
         <div>
             <h1 className="
-                    text-3xl
+                    text-xl
                     font-bold
-                    text-gray-800
+                    text-gray-600
                     mb-6
                     ">
                 User Details

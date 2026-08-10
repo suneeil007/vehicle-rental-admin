@@ -76,12 +76,12 @@ const Header = () => {
                         cursor-pointer
                     "
                 >
-                    <div className="text-right">
+                    <div className="text-right hidden">
                         <p className="text-sm font-semibold text-slate-800">
                             {user?.name || "User"}
                         </p>
 
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-left text-slate-500">
                             {user?.role?.name || "Administrator"}
                         </p>
                     </div>
@@ -156,7 +156,7 @@ const Header = () => {
                         >
                             <div className="px-4 py-3 border-b">
                                 <p className="text-sm font-semibold text-slate-800">
-                                    {user?.name || "User"}
+                                    {user?.name || "User"} 
                                 </p>
 
                                 <p className="text-xs text-slate-500 mt-0.5">

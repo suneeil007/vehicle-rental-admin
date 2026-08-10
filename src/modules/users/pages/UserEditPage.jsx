@@ -62,7 +62,7 @@ const UserEditPage = () => {
     return (
         <div>
             <h1 className="
-                text-3xl
+                text-xl
                 font-bold
                 mb-6
                 cursor-pointer">
