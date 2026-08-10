@@ -156,7 +156,9 @@ const UserTable = ({
                                 row
                                     .getVisibleCells()
                                     .map(cell=>(
-                                <TableCell key={cell.id}>
+                                <TableCell key={cell.id}
+                                 className="text-sm text-gray-700"
+                                >
                                     {
                                             flexRender(
                                             cell.column.columnDef.cell,

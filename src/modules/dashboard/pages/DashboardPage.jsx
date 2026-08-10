@@ -1,7 +1,10 @@
 import StatsCard from "../components/StatsCard";
 import useDashboard from "../hooks/useDashboard";
+import useDocumentTitle from "@/app/hooks/useDocumentTitle";
 
 const DashboardPage = () => {
+
+    useDocumentTitle("Dashboard");
 
     const { data, isLoading, error } = useDashboard();
 

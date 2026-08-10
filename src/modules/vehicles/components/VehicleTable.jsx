@@ -189,11 +189,10 @@ const VehicleTable = ({
                                                 .map((cell) => (
                                                     <TableCell
                                                         key={cell.id}
+                                                        className="text-sm text-gray-700"
                                                     >
                                                         {flexRender(
-                                                            cell.column
-                                                                .columnDef
-                                                                .cell,
+                                                            cell.column.columnDef.cell,
                                                             cell.getContext()
                                                         )}
                                                     </TableCell>

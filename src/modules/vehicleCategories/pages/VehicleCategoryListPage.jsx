@@ -8,10 +8,13 @@ import VehicleCategoryTable from "../components/vehicleCategoryTable";
 import VehicleCategoryColumns from "../components/VehicleCategoryColumns";
 import DeleteVehicleCategoryDialog from "../components/DeleteVehicleCategoryDialog";
 import VehicleCategoryToolbar from "../components/VehicleCategoryToolbar"
-
+import useDocumentTitle from "@/app/hooks/useDocumentTitle";
 
 
 const VehicleCategoryListPage = () => {
+    
+   useDocumentTitle("Vehicle Categories"); 
+    
     const navigate = useNavigate();
 
     const { data = [], isLoading } = useVehicleCategories();

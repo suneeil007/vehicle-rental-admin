@@ -14,16 +14,19 @@ import {
 import { format } from "date-fns";
 
 import useUser from "../hooks/useUser";
+import useDocumentTitle from "@/app/hooks/useDocumentTitle";
 
 const UserViewPage = () => {
 
     const { slug } = useParams();
     const navigate = useNavigate();
-
+    
     const {
         data,
         isLoading
     } = useUser(slug);
+
+    useDocumentTitle(data ? `View ${data.name}` : "View User");
 
     if (isLoading) {
         return <div>

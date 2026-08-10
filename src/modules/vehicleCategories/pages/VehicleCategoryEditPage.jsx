@@ -6,6 +6,7 @@ import VehicleCategoryForm from "../components/vehicleCategoryForm";
 import useVehicleCategory from "../hooks/useVehicleCategory";
 import useUpdateVehicleCategory from "../hooks/useUpdateVehicleCategory";
 import { toFormData } from "../../../utils/toFormData"; 
+import useDocumentTitle from "@/app/hooks/useDocumentTitle";
 
 const VehicleCategoryEditPage = () => {
 
@@ -16,6 +17,8 @@ const VehicleCategoryEditPage = () => {
         data: vehicleCategory,
         isLoading,
     } = useVehicleCategory(slug);
+
+    useDocumentTitle(vehicleCategory ? `Edit ${vehicleCategory.name}` : "Edit Vehicle Category");
 
     const updateMutation = useUpdateVehicleCategory();
 

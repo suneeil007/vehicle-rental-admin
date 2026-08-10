@@ -2,10 +2,13 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import UserForm from "../components/UserForm";
 import useCreateUser from "../hooks/useCreateUser";
+import useDocumentTitle from "@/app/hooks/useDocumentTitle";
 
 
 const CreateUserPage = () => {
 
+    useDocumentTitle("Create User");
+    
     const navigate = useNavigate();
 
     const {

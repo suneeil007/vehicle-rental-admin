@@ -4,8 +4,11 @@ import { toast } from "sonner";
 import VehicleCategoryForm from "../components/vehicleCategoryForm";
 import useCreateVehicleCategory from "../hooks/useCreateVehicleCategory";
 import { toFormData } from "../../../utils/toFormData"; 
+import useDocumentTitle from "@/app/hooks/useDocumentTitle";
 
 const VehicleCategoryCreatePage = () => {
+
+    useDocumentTitle("Create Vehicle Category");
 
     const navigate = useNavigate();
 

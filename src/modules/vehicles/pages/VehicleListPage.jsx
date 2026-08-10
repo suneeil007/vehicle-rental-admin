@@ -8,8 +8,12 @@ import VehicleColumns from "../components/VehicleColumns";
 import VehicleTable from "../components/VehicleTable";
 import VehicleToolbar from "../components/VehicleToolbar";
 import DeleteVehicleDialog from "../components/DeleteVehicleDialog";
+import useDocumentTitle from "@/app/hooks/useDocumentTitle";
 
 const VehicleListPage = () => {
+   
+    useDocumentTitle("Vehicles");
+   
     const navigate = useNavigate();
 
     const { data = [], isLoading } = useVehicles();

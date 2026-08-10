@@ -11,8 +11,10 @@ import useUsers from "../hooks/useUsers";
 import { userColumns } from "../components/UserColumns";
 import useDeleteUser from "../hooks/useDeleteUser";
 import { toast } from "sonner";
+import useDocumentTitle from "@/app/hooks/useDocumentTitle";
 
 const UserListPage = ()=>{
+useDocumentTitle("Users");
 const navigate = useNavigate();
 const [selectedUser, setSelectedUser] = useState(null);
 const [dialogOpen, setDialogOpen] = useState(false);

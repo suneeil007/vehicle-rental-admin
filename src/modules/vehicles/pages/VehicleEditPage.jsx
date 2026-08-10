@@ -6,12 +6,15 @@ import useVehicle from "../hooks/useVehicle";
 import useUpdateVehicle from "../hooks/useUpdateVehicle";
 import { toFormData } from "../../../utils/toFormData";
 
+import useDocumentTitle from "@/app/hooks/useDocumentTitle";
+
 const VehicleEditPage = () => {
 
     const navigate = useNavigate();
     const { slug } = useParams();
 
     const { data: vehicle, isLoading } = useVehicle(slug);
+    useDocumentTitle(vehicle ? `Edit ${vehicle.name}` : "Edit Vehicle");
     const updateMutation = useUpdateVehicle();
 
     const handleSubmit = (data) => {

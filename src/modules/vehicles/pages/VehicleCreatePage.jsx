@@ -4,9 +4,12 @@ import { toast } from "sonner";
 import VehicleForm from "../components/vehicleForm";
 import useCreateVehicle from "../hooks/useCreateVehicle";
 import { toFormData } from "../../../utils/toFormData";
+import useDocumentTitle from "@/app/hooks/useDocumentTitle";
 
 const VehicleCreatePage = () => {
 
+    useDocumentTitle("Create Vehicle");
+    
     const navigate = useNavigate();
     const { mutate, isPending } = useCreateVehicle();
 

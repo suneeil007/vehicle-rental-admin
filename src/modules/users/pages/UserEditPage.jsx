@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import UserForm from "../components/UserForm";
 import useUser from "../hooks/useUser";
 import useUpdateUser from "../hooks/useUpdateUser";
+import useDocumentTitle from "@/app/hooks/useDocumentTitle";
 
 
 const UserEditPage = () => {
@@ -15,6 +16,8 @@ const UserEditPage = () => {
         data: user,
         isLoading
     } = useUser(slug);
+
+    useDocumentTitle(user ? `Edit ${user.name}` : "Edit User");
 
     const {
         mutate,
