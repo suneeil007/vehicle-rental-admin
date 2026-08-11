@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { List } from "lucide-react";
 
 import UserForm from "../components/UserForm";
 import useUser from "../hooks/useUser";
@@ -64,13 +65,37 @@ const UserEditPage = () => {
 
     return (
         <div>
-            <h1 className="
-                text-xl
-                font-bold
-                mb-6
-                cursor-pointer">
-                Edit User
-            </h1>
+           {/* Page Header */}
+            <div className="flex items-center justify-between mb-1">
+                <h1 className="text-xl font-bold text-gray-800">
+                    Edit User
+                </h1>
+
+                <button
+                    type="button"
+                    onClick={() => navigate("/users")}
+                    className="
+                        h-10 w-10
+                        flex items-center justify-center
+                        rounded-md
+                        text-blue-600
+                        bg-blue-50
+                        hover:bg-white
+                        transition
+                        cursor-pointer
+                        relative top-[10px]
+                    "
+                    title="Users List"
+                >
+                    <List className="h-4 w-4" />
+                </button>
+            </div>
+
+            <p className="text-sm text-gray-500 mb-6">
+                Update the user’s information
+            </p>
+
+            
             <UserForm
                 key={user?.slug}
                 defaultValues={user}

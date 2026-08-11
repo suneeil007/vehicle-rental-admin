@@ -1,21 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import branchService from "../services/branchService";
-
+import { fetchBranches } from "../services/branchService";
+import { branchKeys } from "../api/branchKeys";
 
 const useBranches = () => {
-
     return useQuery({
-
-        queryKey:[
-            "branches"
-        ],
-
-        queryFn:
-            branchService.getAll
-
+        queryKey: branchKeys.all,
+        queryFn: fetchBranches,
     });
-
 };
-
 
 export default useBranches;

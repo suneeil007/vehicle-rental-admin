@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateVehicle } from "../api/vehicleApi";
+import { vehicleKeys } from "../api/vehicleKeys";
 
 const useUpdateVehicle = () => {
 
@@ -8,7 +9,7 @@ const useUpdateVehicle = () => {
     return useMutation({
         mutationFn: updateVehicle,
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["Vehicles"]});
+            queryClient.invalidateQueries({ queryKey: vehicleKeys.all });
         },
     });
 };

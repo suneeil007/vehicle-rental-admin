@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-
+import { List } from "lucide-react";
 import VehicleCategoryForm from "../components/vehicleCategoryForm";
 import useCreateVehicleCategory from "../hooks/useCreateVehicleCategory";
 import { toFormData } from "../../../utils/toFormData"; 
@@ -43,10 +43,30 @@ const VehicleCategoryCreatePage = () => {
 
         <div className="space-y-6">
 
-            <div>
-                <h1 className="text-2xl font-bold">Create Vehicle Category</h1>
-                <p className="text-gray-500">Add a new vehicle category</p>
-            </div>
+            <div className="flex items-center justify-between mb-0">
+                <h1 className="text-xl font-bold text-gray-600 mb-0">Create Vehicle Category</h1>
+            
+                <button
+                        type="button"
+                        onClick={() => navigate("/vehicle-categories")}
+                        className="
+                            h-10 w-10
+                            flex items-center justify-center
+                            rounded-md
+                            text-blue-600
+                            bg-blue-50
+                            hover:bg-white
+                            transition
+                            cursor-pointer
+                            relative top-[10px]
+                        "
+                        title="Users List"
+                    >
+                        <List className="h-4 w-4" />
+                    </button>
+                </div>
+
+            <p className="text-gray-500 text-sm">Add a new vehicle category</p>
 
             <VehicleCategoryForm
                 onSubmit={handleCreate}

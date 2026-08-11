@@ -236,7 +236,7 @@ const VehicleTable = ({
                         onClick={() => table.previousPage()}
                         className="
                             px-4
-                            py-2
+                            py-1
                             bg-blue-600
                             text-white
                             border
@@ -244,7 +244,8 @@ const VehicleTable = ({
                             text-sm
                             hover:bg-blue-700
                             disabled:opacity-50
-                            disabled:cursor-not-allowed">
+                            cursor-pointer
+                         ">
                         Previous
                     </button>
 
@@ -254,7 +255,7 @@ const VehicleTable = ({
                             px-3
                             py-2
                             text-sm
-                            whitespace-nowrap">
+                            whitespace-nowrap text-gray-600">
                         Page{" "}
                         {table.getState().pagination.pageIndex + 1}{" "}
                         of{" "}
@@ -268,12 +269,13 @@ const VehicleTable = ({
                         onClick={() => table.nextPage()}
                         className="
                             px-4
-                            py-2
+                            py-1
                             bg-blue-600
                             text-white
                             border
                             rounded
                             text-sm
+                            cursor-pointer
                             hover:bg-blue-700
                             disabled:opacity-50">
                         Next

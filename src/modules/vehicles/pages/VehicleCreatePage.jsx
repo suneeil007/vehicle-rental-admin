@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-
+import { List } from "lucide-react";
 import VehicleForm from "../components/vehicleForm";
 import useCreateVehicle from "../hooks/useCreateVehicle";
 import { toFormData } from "../../../utils/toFormData";
@@ -59,10 +59,31 @@ const VehicleCreatePage = () => {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold">Create Vehicle</h1>
-                <p className="text-gray-500">Add a new vehicle to the fleet</p>
-            </div>
+            
+             <div className="flex items-center justify-between mb-0">
+                <h1 className="text-xl font-bold text-gray-600 mb-0">Create Vehicle</h1>
+            
+                <button
+                        type="button"
+                        onClick={() => navigate("/vehicles")}
+                        className="
+                            h-10 w-10
+                            flex items-center justify-center
+                            rounded-md
+                            text-blue-600
+                            bg-blue-50
+                            hover:bg-white
+                            transition
+                            cursor-pointer
+                            relative top-[10px]
+                        "
+                        title="Users List"
+                    >
+                        <List className="h-4 w-4" />
+                    </button>
+                </div>
+
+            <p className="text-gray-500 text-sm">Add a new vehicle to the fleet</p>
 
             <VehicleForm
                 onSubmit={handleCreate}

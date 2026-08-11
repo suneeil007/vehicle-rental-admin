@@ -8,7 +8,8 @@ import {
     User,
     Car,
     Shield,
-    PhoneCall
+    PhoneCall,
+    List,
 } from "lucide-react";
 
 import { format } from "date-fns";
@@ -58,14 +59,35 @@ const UserViewPage = () => {
     return (
 
         <div>
-            <h1 className="
-                    text-xl
-                    font-bold
-                    text-gray-600
-                    mb-6
-                    ">
-                User Details
-            </h1>
+            {/* Page Header */}
+                <div className="flex items-center justify-between mb-1">
+                    <h1 className="text-xl font-bold text-gray-800">
+                        User Details
+                    </h1>
+
+                    <button
+                        type="button"
+                        onClick={() => navigate("/users")}
+                        className="
+                            h-10 w-10
+                            flex items-center justify-center
+                            rounded-md
+                            text-blue-600
+                            bg-blue-50
+                            hover:bg-white
+                            transition
+                            cursor-pointer
+                            relative top-[10px]
+                        "
+                        title="Users List"
+                    >
+                        <List className="h-4 w-4" />
+                    </button>
+                </div>
+
+                <p className="text-sm text-gray-500 mb-6">
+                    View user’s information
+                </p>
 
             <div className="
                         bg-white

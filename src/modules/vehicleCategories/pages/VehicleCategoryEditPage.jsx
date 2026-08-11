@@ -1,5 +1,6 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { List } from "lucide-react";
 
 import VehicleCategoryForm from "../components/vehicleCategoryForm";
 
@@ -80,14 +81,31 @@ const VehicleCategoryEditPage = () => {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold">
-                    Edit Vehicle Category
-                </h1>
-                <p className="text-gray-500">
-                    Update vehicle category details
-                </p>
-            </div>
+        
+            <div className="flex items-center justify-between mb-0">
+                <h1 className="text-xl font-bold text-gray-600 mb-0">Edit Vehicle Category</h1>
+            
+                <button
+                        type="button"
+                        onClick={() => navigate("/vehicle-categories")}
+                        className="
+                            h-10 w-10
+                            flex items-center justify-center
+                            rounded-md
+                            text-blue-600
+                            bg-blue-50
+                            hover:bg-white
+                            transition
+                            cursor-pointer
+                            relative top-[10px]
+                        "
+                        title="Users List"
+                    >
+                        <List className="h-4 w-4" />
+                    </button>
+                </div>
+
+            <p className="text-gray-500 text-sm">Update vehicle category details</p>
 
             <VehicleCategoryForm
                 defaultValues={vehicleCategory}
