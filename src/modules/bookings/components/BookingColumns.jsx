@@ -42,17 +42,27 @@ const BookingColumns = ({
         ),
     },
 
-    {
+   {
         header: "Pickup",
         accessorKey: "pickup_at",
-        cell: ({ row }) => (
-            <div>
-                <p>{formatDateTime(row.original.pickup_at)}</p>
-                <p className="text-xs text-gray-500">
-                    {row.original.pickup_branch?.name ?? "—"}
-                </p>
-            </div>
-        ),
+        cell: ({ row }) => {
+            const booking = row.original;
+
+            const pickup =
+                booking.rental_type === "with_driver"
+                    ? booking.pickup_location
+                    : booking.pickup_branch?.name;
+
+            return (
+                <div>
+                    <p>{formatDateTime(booking.pickup_at)}</p>
+
+                    <p className="text-xs text-gray-500">
+                        {pickup || "—"}
+                    </p>
+                </div>
+            );
+        },
     },
 
     {

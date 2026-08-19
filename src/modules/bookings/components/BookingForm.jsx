@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -40,6 +40,10 @@ import useBranches from "../../branches/hooks/useBranches";
 import { createUser } from "@/modules/users/api/userApi";
 
 
+/* =========================================================
+   RENTAL TYPES
+========================================================= */
+
 const RENTAL_TYPE_OPTIONS = [
     {
         value: "self_drive",
@@ -52,6 +56,227 @@ const RENTAL_TYPE_OPTIONS = [
 ];
 
 
+/* =========================================================
+   FORMAT DATETIME FOR datetime-local
+========================================================= */
+
+const formatDateTimeLocal = (value) => {
+    if (!value) {
+        return "";
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return "";
+    }
+
+    const year = date.getFullYear();
+
+    const month = String(
+        date.getMonth() + 1
+    ).padStart(2, "0");
+
+    const day = String(
+        date.getDate()
+    ).padStart(2, "0");
+
+    const hours = String(
+        date.getHours()
+    ).padStart(2, "0");
+
+    const minutes = String(
+        date.getMinutes()
+    ).padStart(2, "0");
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+
+/* =========================================================
+   GET ID SAFELY
+========================================================= */
+
+const getId = (value) => {
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+        return "";
+    }
+
+    if (typeof value === "object") {
+        return (
+            value.id ??
+            value.branch_id ??
+            value.vehicle_id ??
+            value.customer_id ??
+            value.value ??
+            ""
+        );
+    }
+
+    return value;
+};
+
+
+/* =========================================================
+   NORMALIZE ID
+========================================================= */
+
+const normalizeId = (value) => {
+    const id = getId(value);
+
+    if (
+        id === null ||
+        id === undefined ||
+        id === ""
+    ) {
+        return "";
+    }
+
+    return String(id);
+};
+
+
+/* =========================================================
+   NORMALIZE RENTAL TYPE
+========================================================= */
+
+const normalizeRentalType = (value) => {
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+        return "";
+    }
+
+    if (typeof value === "object") {
+        value =
+            value.value ??
+            value.type ??
+            value.name ??
+            value.label ??
+            value.slug ??
+            value.code ??
+            value.key ??
+            value.rental_type ??
+            "";
+    }
+
+    if (typeof value === "number") {
+        if (value === 0) {
+            return "self_drive";
+        }
+
+        if (value === 1) {
+            return "with_driver";
+        }
+    }
+
+    if (typeof value === "boolean") {
+        return value
+            ? "with_driver"
+            : "self_drive";
+    }
+
+    const normalized = String(value)
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, "_");
+
+    if (
+        normalized === "self_drive" ||
+        normalized === "selfdrive" ||
+        normalized === "self"
+    ) {
+        return "self_drive";
+    }
+
+    if (
+        normalized === "with_driver" ||
+        normalized === "withdriver" ||
+        normalized === "driver" ||
+        normalized === "with_a_driver"
+    ) {
+        return "with_driver";
+    }
+
+    return "";
+};
+
+
+/* =========================================================
+   CUSTOMER ID
+========================================================= */
+
+const getCustomerIdFromBooking = (booking) => {
+    return normalizeId(
+        booking?.customer_id ??
+        booking?.customer?.id ??
+        booking?.customer?.user_id ??
+        ""
+    );
+};
+
+
+/* =========================================================
+   VEHICLE ID
+========================================================= */
+
+const getVehicleIdFromBooking = (booking) => {
+    return normalizeId(
+        booking?.vehicle_id ??
+        booking?.vehicle?.id ??
+        ""
+    );
+};
+
+
+/* =========================================================
+   PICKUP BRANCH ID
+
+   Supports:
+
+   pickup_branch_id
+
+   pickup_branch.id
+
+   pickup_branch.branch_id
+
+   pickup_branch_id returned as object
+========================================================= */
+
+const getPickupBranchIdFromBooking = (booking) => {
+    return normalizeId(
+        booking?.pickup_branch_id ??
+        booking?.pickup_branch?.id ??
+        booking?.pickup_branch?.branch_id ??
+        ""
+    );
+};
+
+
+/* =========================================================
+   DROP BRANCH ID
+========================================================= */
+
+const getDropBranchIdFromBooking = (booking) => {
+    return normalizeId(
+        booking?.drop_branch_id ??
+        booking?.drop_branch?.id ??
+        booking?.drop_branch?.branch_id ??
+        ""
+    );
+};
+
+
+/* =========================================================
+   BOOKING FORM
+========================================================= */
+
 const BookingForm = ({
     onSubmit,
     onCancel,
@@ -59,16 +284,12 @@ const BookingForm = ({
     defaultValues = null,
 }) => {
 
-    /* =========================================================
-       QUERY CLIENT
-    ========================================================= */
-
     const queryClient = useQueryClient();
 
 
-    /* =========================================================
-       DATA
-    ========================================================= */
+    /* =====================================================
+       API DATA
+    ===================================================== */
 
     const { data: users } = useUsers();
     const { data: vehicles } = useVehicles();
@@ -88,20 +309,24 @@ const BookingForm = ({
         : [];
 
 
-    /* =========================================================
-       CUSTOMER CREATE STATE
-    ========================================================= */
+    /* =====================================================
+       CUSTOMER SEARCH
+    ===================================================== */
 
-    const [customerSearch, setCustomerSearch] =
-        useState("");
+    const [
+        customerSearch,
+        setCustomerSearch,
+    ] = useState("");
 
-    const [creatingCustomer, setCreatingCustomer] =
-        useState(false);
+    const [
+        creatingCustomer,
+        setCreatingCustomer,
+    ] = useState(false);
 
 
-    /* =========================================================
+    /* =====================================================
        FORM
-    ========================================================= */
+    ===================================================== */
 
     const {
         register,
@@ -109,13 +334,11 @@ const BookingForm = ({
         setValue,
         watch,
         reset,
-        control,
 
         formState: {
             errors,
             isSubmitting,
         },
-
     } = useForm({
 
         resolver: zodResolver(
@@ -123,51 +346,66 @@ const BookingForm = ({
         ),
 
         defaultValues: {
+
             customer_id: "",
             vehicle_id: "",
             rental_type: "",
+
             pickup_branch_id: "",
             drop_branch_id: "",
+
+            pickup_location: "",
+            drop_location: "",
+
             pickup_at: "",
             expected_return_at: "",
+
             quoted_amount: "",
             discount_amount: "0",
             final_amount: "",
+
             customer_notes: "",
             admin_notes: "",
         },
     });
 
 
-    /* =========================================================
+    /* =====================================================
        WATCH VALUES
-    ========================================================= */
+    ===================================================== */
 
-    const customerId =
-        watch("customer_id");
+    const customerId = watch(
+        "customer_id"
+    );
 
-    const vehicleId =
-        watch("vehicle_id");
+    const vehicleId = watch(
+        "vehicle_id"
+    );
 
-    const rentalType =
-        watch("rental_type");
+    const rentalType = watch(
+        "rental_type"
+    );
 
-    const pickupBranchId =
-        watch("pickup_branch_id");
+    const pickupBranchId = watch(
+        "pickup_branch_id"
+    );
 
-    const dropBranchId =
-        watch("drop_branch_id");
+    const dropBranchId = watch(
+        "drop_branch_id"
+    );
 
-    const quotedAmount =
-        watch("quoted_amount");
+    const quotedAmount = watch(
+        "quoted_amount"
+    );
 
-    const discountAmount =
-        watch("discount_amount");
+    const discountAmount = watch(
+        "discount_amount"
+    );
 
 
-    /* =========================================================
-       LOAD BOOKING DATA WHEN EDITING
-    ========================================================= */
+    /* =====================================================
+       POPULATE EDIT DATA
+    ===================================================== */
 
     useEffect(() => {
 
@@ -175,159 +413,117 @@ const BookingForm = ({
             return;
         }
 
+
         console.log(
-            "================================="
+            "========== BOOKING EDIT DATA =========="
         );
 
         console.log(
-            "BOOKING DATA RECEIVED:",
+            "API BOOKING:",
             defaultValues
         );
 
-        console.log(
-            "================================="
-        );
 
-
-        /* =====================================================
+        /* =================================================
            CUSTOMER
-        ===================================================== */
+        ================================================= */
 
         const customerId =
-            defaultValues.customer?.id ??
-            defaultValues.customer_id ??
-            "";
+            getCustomerIdFromBooking(
+                defaultValues
+            );
 
 
-        /* =====================================================
+        /* =================================================
            VEHICLE
-        ===================================================== */
+        ================================================= */
 
         const vehicleId =
-            defaultValues.vehicle?.id ??
-            defaultValues.vehicle_id ??
-            "";
+            getVehicleIdFromBooking(
+                defaultValues
+            );
 
 
-        /* =====================================================
+        /* =================================================
            RENTAL TYPE
-        ===================================================== */
+        ================================================= */
 
         const rentalType =
-            defaultValues.rental_type ??
-            "";
+            normalizeRentalType(
+                defaultValues.rental_type ??
+                defaultValues.rentalType ??
+                defaultValues.booking_type ??
+                defaultValues.bookingType ??
+                defaultValues.type
+            );
 
 
-        /* =====================================================
+        /* =================================================
            PICKUP BRANCH
-        ===================================================== */
+        ================================================= */
 
         const pickupBranchId =
-            defaultValues.pickup_branch?.id ??
-            defaultValues.pickup_branch_id ??
-            "";
+            getPickupBranchIdFromBooking(
+                defaultValues
+            );
 
 
-        /* =====================================================
+        /* =================================================
            DROP BRANCH
-        ===================================================== */
+        ================================================= */
 
         const dropBranchId =
-            defaultValues.drop_branch?.id ??
-            defaultValues.drop_branch_id ??
+            getDropBranchIdFromBooking(
+                defaultValues
+            );
+
+
+        /* =================================================
+           LOCATIONS
+        ================================================= */
+
+        const pickupLocation =
+            defaultValues.pickup_location ??
+            "";
+
+        const dropLocation =
+            defaultValues.drop_location ??
             "";
 
 
-        /* =====================================================
-           DATETIME FORMATTER
-           
-           API:
-           2026-08-26T09:00:00.000000Z
+        /* =================================================
+           BUILD FORM VALUES
 
-           INPUT:
-           2026-08-26T14:45
-        ===================================================== */
+           IMPORTANT:
 
-        const formatDateTimeLocal = (
-            value
-        ) => {
+           Do NOT remove branch IDs based on rental type
+           while reading API data.
 
-            if (!value) {
-                return "";
-            }
-
-            const date = new Date(value);
-
-            if (
-                Number.isNaN(
-                    date.getTime()
-                )
-            ) {
-                return "";
-            }
-
-            const year =
-                date.getFullYear();
-
-            const month =
-                String(
-                    date.getMonth() + 1
-                ).padStart(2, "0");
-
-            const day =
-                String(
-                    date.getDate()
-                ).padStart(2, "0");
-
-            const hours =
-                String(
-                    date.getHours()
-                ).padStart(2, "0");
-
-            const minutes =
-                String(
-                    date.getMinutes()
-                ).padStart(2, "0");
-
-            return (
-                `${year}-${month}-${day}` +
-                `T${hours}:${minutes}`
-            );
-        };
-
-
-        /* =====================================================
-           FORM VALUES
-        ===================================================== */
+           Let the API determine what exists.
+        ================================================= */
 
         const values = {
 
             customer_id:
-                customerId !== ""
-                    ? String(customerId)
-                    : "",
+                customerId,
 
             vehicle_id:
-                vehicleId !== ""
-                    ? String(vehicleId)
-                    : "",
+                vehicleId,
 
             rental_type:
-                rentalType
-                    ? String(rentalType)
-                    : "",
+                rentalType,
 
             pickup_branch_id:
-                pickupBranchId !== ""
-                    ? String(
-                          pickupBranchId
-                      )
-                    : "",
+                pickupBranchId,
 
             drop_branch_id:
-                dropBranchId !== ""
-                    ? String(dropBranchId)
-                    : "",
+                dropBranchId,
+
+            pickup_location:
+                pickupLocation,
+
+            drop_location:
+                dropLocation,
 
             pickup_at:
                 formatDateTimeLocal(
@@ -340,50 +536,64 @@ const BookingForm = ({
                 ),
 
             quoted_amount:
-                defaultValues.quoted_amount !=
-                null
+                defaultValues.quoted_amount !==
+                    null &&
+                defaultValues.quoted_amount !==
+                    undefined
                     ? String(
-                          defaultValues.quoted_amount
-                      )
+                        defaultValues.quoted_amount
+                    )
                     : "",
 
             discount_amount:
-                defaultValues.discount_amount !=
-                null
+                defaultValues.discount_amount !==
+                    null &&
+                defaultValues.discount_amount !==
+                    undefined
                     ? String(
-                          defaultValues.discount_amount
-                      )
+                        defaultValues.discount_amount
+                    )
                     : "0",
 
             final_amount:
-                defaultValues.final_amount !=
-                null
+                defaultValues.final_amount !==
+                    null &&
+                defaultValues.final_amount !==
+                    undefined
                     ? String(
-                          defaultValues.final_amount
-                      )
+                        defaultValues.final_amount
+                    )
                     : "",
 
             customer_notes:
-                defaultValues.customer_notes ||
+                defaultValues.customer_notes ??
                 "",
 
             admin_notes:
-                defaultValues.admin_notes ||
+                defaultValues.admin_notes ??
                 "",
         };
 
 
         console.log(
-            "FORM RESET VALUES:",
+            "NORMALIZED FORM VALUES:",
             values
         );
 
 
-        /* =====================================================
+        /* =================================================
            RESET FORM
-        ===================================================== */
+        ================================================= */
 
         reset(values);
+
+
+        /* =================================================
+           CUSTOMER SEARCH RESET
+        ================================================= */
+
+        setCustomerSearch("");
+
 
     }, [
         defaultValues,
@@ -391,32 +601,27 @@ const BookingForm = ({
     ]);
 
 
-    /* =========================================================
+    /* =====================================================
        AUTO CALCULATE FINAL AMOUNT
-    ========================================================= */
+    ===================================================== */
 
     useEffect(() => {
 
         const quoted =
-            parseFloat(
-                quotedAmount
-            ) || 0;
+            Number(quotedAmount) || 0;
 
         const discount =
-            parseFloat(
-                discountAmount
-            ) || 0;
+            Number(discountAmount) || 0;
 
-        const final =
+        const finalAmount =
             Math.max(
                 quoted - discount,
                 0
             );
 
-
         setValue(
             "final_amount",
-            final.toFixed(2),
+            finalAmount.toFixed(2),
             {
                 shouldValidate: true,
             }
@@ -429,9 +634,78 @@ const BookingForm = ({
     ]);
 
 
-    /* =========================================================
-       CREATE NEW CUSTOMER
-    ========================================================= */
+    /* =====================================================
+       CHANGE RENTAL TYPE
+    ===================================================== */
+
+    const handleRentalTypeChange = (
+        value
+    ) => {
+
+        setValue(
+            "rental_type",
+            value,
+            {
+                shouldValidate: true,
+                shouldDirty: true,
+            }
+        );
+
+
+        if (
+            value === "self_drive"
+        ) {
+
+            setValue(
+                "pickup_location",
+                "",
+                {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                }
+            );
+
+            setValue(
+                "drop_location",
+                "",
+                {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                }
+            );
+
+        }
+
+
+        if (
+            value === "with_driver"
+        ) {
+
+            setValue(
+                "pickup_branch_id",
+                "",
+                {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                }
+            );
+
+            setValue(
+                "drop_branch_id",
+                "",
+                {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                }
+            );
+
+        }
+    };
+
+
+    /* =====================================================
+       CREATE CUSTOMER
+    ===================================================== */
 
     const handleCreateCustomer =
         async () => {
@@ -443,15 +717,12 @@ const BookingForm = ({
                 return;
             }
 
-
             try {
 
-                setCreatingCustomer(true);
+                setCreatingCustomer(
+                    true
+                );
 
-
-                /* =================================================
-                   PASSWORD
-                ================================================= */
 
                 const firstFourLetters =
                     name
@@ -459,21 +730,21 @@ const BookingForm = ({
                             /\s+/g,
                             ""
                         )
-                        .slice(0, 4)
+                        .slice(
+                            0,
+                            4
+                        )
                         .toLowerCase();
+
 
                 const password =
                     `${firstFourLetters}@2026`;
 
 
-                /* =================================================
-                   CREATE CUSTOMER
-                ================================================= */
-
                 const response =
                     await createUser({
 
-                        name: name,
+                        name,
 
                         email:
                             `customer_${Date.now()}@rental.local`,
@@ -484,8 +755,7 @@ const BookingForm = ({
 
                         branch_id: null,
 
-                        password:
-                            password,
+                        password,
 
                         password_confirmation:
                             password,
@@ -500,12 +770,9 @@ const BookingForm = ({
                 );
 
 
-                /* =================================================
-                   GET NEW CUSTOMER
-                ================================================= */
-
                 const newCustomer =
-                    response?.data ||
+                    response?.data?.data ??
+                    response?.data ??
                     response;
 
 
@@ -518,7 +785,7 @@ const BookingForm = ({
                 if (!newCustomer?.id) {
 
                     console.error(
-                        "Customer was created but no customer ID was returned.",
+                        "Customer created but ID was not returned.",
                         response
                     );
 
@@ -526,19 +793,10 @@ const BookingForm = ({
                 }
 
 
-                /* =================================================
-                   REFRESH USERS
-                ================================================= */
-
                 await queryClient.refetchQueries({
                     queryKey: ["users"],
-                    type: "active",
                 });
 
-
-                /* =================================================
-                   SELECT NEW CUSTOMER
-                ================================================= */
 
                 setValue(
                     "customer_id",
@@ -546,11 +804,8 @@ const BookingForm = ({
                         newCustomer.id
                     ),
                     {
-                        shouldValidate:
-                            true,
-
-                        shouldDirty:
-                            true,
+                        shouldValidate: true,
+                        shouldDirty: true,
                     }
                 );
 
@@ -560,19 +815,19 @@ const BookingForm = ({
 
             } catch (error) {
 
-                console.log(
-                    "STATUS:",
-                    error.response?.status
-                );
-
-                console.log(
-                    "API ERROR:",
-                    error.response?.data
+                console.error(
+                    "CUSTOMER CREATE ERROR:",
+                    error
                 );
 
                 console.error(
-                    "Failed to create customer:",
-                    error
+                    "STATUS:",
+                    error?.response?.status
+                );
+
+                console.error(
+                    "DATA:",
+                    error?.response?.data
                 );
 
             } finally {
@@ -584,64 +839,104 @@ const BookingForm = ({
         };
 
 
-    /* =========================================================
-       SUBMIT DEBUG
-    ========================================================= */
+    /* =====================================================
+       SUBMIT
+    ===================================================== */
 
-    const submitForm = (data) => {
+    const submitForm = (
+        data
+    ) => {
 
-        // console.log(
-        //     "================================="
-        // );
+        const isSelfDrive =
+            data.rental_type ===
+            "self_drive";
 
-        // console.log(
-        //     "BOOKING FORM SUBMIT DATA:",
-        //     data
-        // );
 
-        // console.log(
-        //     "CUSTOMER:",
-        //     data.customer_id
-        // );
+        const payload = {
 
-        // console.log(
-        //     "VEHICLE:",
-        //     data.vehicle_id
-        // );
+            ...data,
 
-        // console.log(
-        //     "RENTAL TYPE:",
-        //     data.rental_type
-        // );
+            customer_id:
+                data.customer_id
+                    ? Number(
+                        data.customer_id
+                    )
+                    : null,
 
-        // console.log(
-        //     "PICKUP BRANCH:",
-        //     data.pickup_branch_id
-        // );
+            vehicle_id:
+                data.vehicle_id
+                    ? Number(
+                        data.vehicle_id
+                    )
+                    : null,
 
-        // console.log(
-        //     "DROP BRANCH:",
-        //     data.drop_branch_id
-        // );
 
-        // console.log(
-        //     "================================="
-        // );
+            pickup_branch_id:
+                isSelfDrive &&
+                data.pickup_branch_id
+                    ? Number(
+                        data.pickup_branch_id
+                    )
+                    : null,
 
-        onSubmit(data);
+
+            drop_branch_id:
+                isSelfDrive &&
+                data.drop_branch_id
+                    ? Number(
+                        data.drop_branch_id
+                    )
+                    : null,
+
+
+            pickup_location:
+                isSelfDrive
+                    ? null
+                    : data.pickup_location
+                        ?.trim() ||
+                    null,
+
+
+            drop_location:
+                isSelfDrive
+                    ? null
+                    : data.drop_location
+                        ?.trim() ||
+                    null,
+        };
+
+
+        console.log(
+            "FINAL BOOKING PAYLOAD:",
+            payload
+        );
+
+
+        onSubmit(
+            payload
+        );
     };
 
 
-    /* =========================================================
+    /* =====================================================
        RENDER
-    ========================================================= */
+    ===================================================== */
 
     return (
 
         <form
-            onSubmit={handleSubmit(
-                submitForm
-            )}
+            onSubmit={
+                handleSubmit(
+                    submitForm,
+                    (validationErrors) => {
+                        console.log(
+                            "BOOKING VALIDATION ERRORS:",
+                            validationErrors
+                        );
+                    }
+                )
+            }
+
             className="
                 bg-white
                 border
@@ -673,7 +968,6 @@ const BookingForm = ({
                         Customer
                     </label>
 
-
                     <Popover>
 
                         <PopoverTrigger
@@ -683,6 +977,7 @@ const BookingForm = ({
                             <button
                                 type="button"
                                 role="combobox"
+
                                 className="
                                     form-input
                                     w-full
@@ -700,19 +995,19 @@ const BookingForm = ({
                                         ? (
                                             customers.find(
                                                 (customer) =>
-                                                    String(
+                                                    normalizeId(
                                                         customer.id
                                                     ) ===
-                                                    String(
+                                                    normalizeId(
                                                         customerId
                                                     )
                                             )?.name ||
+                                            defaultValues?.customer?.name ||
                                             "Customer selected"
                                         )
                                         : "Select customer"}
 
                                 </span>
-
 
                                 <ChevronsUpDown
                                     className="
@@ -731,6 +1026,7 @@ const BookingForm = ({
 
                         <PopoverContent
                             align="start"
+
                             className="
                                 w-[var(--radix-popover-trigger-width)]
                                 min-w-0
@@ -738,32 +1034,26 @@ const BookingForm = ({
                             "
                         >
 
-                            <Command className="w-full">
+                            <Command>
 
                                 <CommandInput
                                     placeholder="Search customer..."
-                                    className="text-left"
+
                                     value={
                                         customerSearch
                                     }
+
                                     onValueChange={
                                         setCustomerSearch
                                     }
                                 />
 
-
                                 <CommandList>
-
-                                    {/* =================================================
-                                        CREATE CUSTOMER
-                                    ================================================= */}
 
                                     {customerSearch.trim() &&
                                         !customers.some(
                                             (customer) =>
-                                                `${customer.name || ""} ${
-                                                    customer.email || ""
-                                                }`
+                                                `${customer.name || ""} ${customer.email || ""}`
                                                     .toLowerCase()
                                                     .includes(
                                                         customerSearch
@@ -772,29 +1062,35 @@ const BookingForm = ({
                                                     )
                                         ) && (
 
-                                            <div className="
-                                                p-2
-                                                border-b
-                                            ">
+                                            <div
+                                                className="
+                                                    p-2
+                                                    border-b
+                                                "
+                                            >
 
-                                                <div className="
-                                                    px-2
-                                                    py-2
-                                                    text-sm
-                                                    text-gray-500
-                                                ">
+                                                <div
+                                                    className="
+                                                        px-2
+                                                        py-2
+                                                        text-sm
+                                                        text-gray-500
+                                                    "
+                                                >
                                                     No customer found.
                                                 </div>
 
-
                                                 <button
                                                     type="button"
+
                                                     onClick={
                                                         handleCreateCustomer
                                                     }
+
                                                     disabled={
                                                         creatingCustomer
                                                     }
+
                                                     className="
                                                         w-full
                                                         flex
@@ -808,7 +1104,6 @@ const BookingForm = ({
                                                         font-medium
                                                         hover:bg-blue-50
                                                         disabled:opacity-50
-                                                        cursor-pointer
                                                     "
                                                 >
 
@@ -827,12 +1122,9 @@ const BookingForm = ({
                                                 </button>
 
                                             </div>
+
                                         )}
 
-
-                                    {/* =================================================
-                                        CUSTOMERS
-                                    ================================================= */}
 
                                     <CommandGroup>
 
@@ -859,15 +1151,12 @@ const BookingForm = ({
                                                             {
                                                                 shouldValidate:
                                                                     true,
-
                                                                 shouldDirty:
                                                                     true,
                                                             }
                                                         );
 
-                                                        setCustomerSearch(
-                                                            ""
-                                                        );
+                                                        setCustomerSearch("");
 
                                                     }}
                                                 >
@@ -877,11 +1166,12 @@ const BookingForm = ({
                                                             mr-2
                                                             h-4
                                                             w-4
+
                                                             ${
-                                                                String(
+                                                                normalizeId(
                                                                     customerId
                                                                 ) ===
-                                                                String(
+                                                                normalizeId(
                                                                     customer.id
                                                                 )
                                                                     ? "opacity-100"
@@ -889,7 +1179,6 @@ const BookingForm = ({
                                                             }
                                                         `}
                                                     />
-
 
                                                     <span className="truncate">
 
@@ -904,19 +1193,11 @@ const BookingForm = ({
                                                     </span>
 
                                                 </CommandItem>
+
                                             )
                                         )}
 
                                     </CommandGroup>
-
-
-                                    {customers.length === 0 &&
-                                        !customerSearch.trim() && (
-
-                                            <CommandEmpty>
-                                                No customer found.
-                                            </CommandEmpty>
-                                        )}
 
                                 </CommandList>
 
@@ -926,12 +1207,9 @@ const BookingForm = ({
 
                     </Popover>
 
-
                     <p className="error-text">
                         {
-                            errors
-                                .customer_id
-                                ?.message
+                            errors.customer_id?.message
                         }
                     </p>
 
@@ -948,7 +1226,6 @@ const BookingForm = ({
                         Vehicle
                     </label>
 
-
                     <Popover>
 
                         <PopoverTrigger
@@ -958,6 +1235,7 @@ const BookingForm = ({
                             <button
                                 type="button"
                                 role="combobox"
+
                                 className="
                                     form-input
                                     w-full
@@ -975,19 +1253,19 @@ const BookingForm = ({
                                         ? (
                                             vehicleList.find(
                                                 (vehicle) =>
-                                                    String(
+                                                    normalizeId(
                                                         vehicle.id
                                                     ) ===
-                                                    String(
+                                                    normalizeId(
                                                         vehicleId
                                                     )
                                             )?.name ||
+                                            defaultValues?.vehicle?.name ||
                                             "Vehicle selected"
                                         )
                                         : "Select vehicle"}
 
                                 </span>
-
 
                                 <ChevronsUpDown
                                     className="
@@ -1006,6 +1284,7 @@ const BookingForm = ({
 
                         <PopoverContent
                             align="start"
+
                             className="
                                 w-[var(--radix-popover-trigger-width)]
                                 min-w-0
@@ -1019,13 +1298,11 @@ const BookingForm = ({
                                     placeholder="Search vehicle..."
                                 />
 
-
                                 <CommandList>
 
                                     <CommandEmpty>
                                         No vehicle found.
                                     </CommandEmpty>
-
 
                                     <CommandGroup>
 
@@ -1052,7 +1329,6 @@ const BookingForm = ({
                                                             {
                                                                 shouldValidate:
                                                                     true,
-
                                                                 shouldDirty:
                                                                     true,
                                                             }
@@ -1063,22 +1339,24 @@ const BookingForm = ({
 
                                                     <Check
                                                         className={`
+
                                                             mr-2
                                                             h-4
                                                             w-4
+
                                                             ${
-                                                                String(
+                                                                normalizeId(
                                                                     vehicleId
                                                                 ) ===
-                                                                String(
+                                                                normalizeId(
                                                                     vehicle.id
                                                                 )
                                                                     ? "opacity-100"
                                                                     : "opacity-0"
                                                             }
+
                                                         `}
                                                     />
-
 
                                                     <span className="truncate">
 
@@ -1093,6 +1371,7 @@ const BookingForm = ({
                                                     </span>
 
                                                 </CommandItem>
+
                                             )
                                         )}
 
@@ -1106,12 +1385,9 @@ const BookingForm = ({
 
                     </Popover>
 
-
                     <p className="error-text">
                         {
-                            errors
-                                .vehicle_id
-                                ?.message
+                            errors.vehicle_id?.message
                         }
                     </p>
 
@@ -1128,34 +1404,17 @@ const BookingForm = ({
                         Rental Type
                     </label>
 
-
                     <Select
-                        key={
-                            `rental_type-${defaultValues?.id ?? "new"}-${rentalType}`
-                        }
+
+                        key={`rental-type-${defaultValues?.id ?? "new"}-${rentalType}`}
 
                         value={
-                            rentalType ||
-                            ""
+                            rentalType || ""
                         }
 
-                        onValueChange={(
-                            value
-                        ) => {
-
-                            setValue(
-                                "rental_type",
-                                value,
-                                {
-                                    shouldValidate:
-                                        true,
-
-                                    shouldDirty:
-                                        true,
-                                }
-                            );
-
-                        }}
+                        onValueChange={
+                            handleRentalTypeChange
+                        }
                     >
 
                         <SelectTrigger
@@ -1168,23 +1427,10 @@ const BookingForm = ({
                         >
 
                             <SelectValue
-                                placeholder="
-                                    Select rental type
-                                "
-                            >
-
-                                {rentalType
-                                    ? RENTAL_TYPE_OPTIONS.find(
-                                          (option) =>
-                                              option.value ===
-                                              rentalType
-                                      )?.label
-                                    : undefined}
-
-                            </SelectValue>
+                                placeholder="Select rental type"
+                            />
 
                         </SelectTrigger>
-
 
                         <SelectContent>
 
@@ -1195,15 +1441,14 @@ const BookingForm = ({
                                         key={
                                             option.value
                                         }
+
                                         value={
                                             option.value
                                         }
                                     >
-
                                         {
                                             option.label
                                         }
-
                                     </SelectItem>
 
                                 )
@@ -1213,12 +1458,9 @@ const BookingForm = ({
 
                     </Select>
 
-
                     <p className="error-text">
                         {
-                            errors
-                                .rental_type
-                                ?.message
+                            errors.rental_type?.message
                         }
                     </p>
 
@@ -1226,226 +1468,246 @@ const BookingForm = ({
 
 
                 {/* =================================================
-                    PICKUP BRANCH
+                    PICKUP
                 ================================================= */}
 
                 <div>
 
                     <label className="form-label">
-                        Pickup Branch
+
+                        {rentalType ===
+                        "with_driver"
+                            ? "Pickup Location"
+                            : "Pickup Branch"}
+
                     </label>
 
 
-                    <Select
-                        key={
-                            `pickup_branch-${defaultValues?.id ?? "new"}-${pickupBranchId}`
-                        }
+                    {rentalType ===
+                    "with_driver" ? (
 
-                        value={
-                            pickupBranchId ||
-                            ""
-                        }
+                        <input
+                            type="text"
 
-                        onValueChange={(
-                            value
-                        ) => {
+                            {...register(
+                                "pickup_location"
+                            )}
 
-                            setValue(
-                                "pickup_branch_id",
-                                value,
-                                {
-                                    shouldValidate:
-                                        true,
+                            className="form-input"
 
-                                    shouldDirty:
-                                        true,
+                            placeholder="Enter pickup address"
+                        />
+
+                    ) : (
+
+                        <Select
+
+                            key={`pickup-branch-${defaultValues?.id ?? "new"}-${pickupBranchId}`}
+
+                            value={
+                                pickupBranchId || ""
+                            }
+
+                            onValueChange={
+                                (value) => {
+
+                                    setValue(
+                                        "pickup_branch_id",
+                                        value,
+                                        {
+                                            shouldValidate:
+                                                true,
+                                            shouldDirty:
+                                                true,
+                                        }
+                                    );
+
                                 }
-                            );
-
-                        }}
-                    >
-
-                        <SelectTrigger
-                            className="
-                                w-full
-                                h-11
-                                rounded-lg
-                                border-gray-300
-                            "
+                            }
                         >
 
-                            <SelectValue
-                                placeholder="
-                                    Select pickup branch
+                            <SelectTrigger
+                                className="
+                                    w-full
+                                    h-11
+                                    rounded-lg
+                                    border-gray-300
                                 "
                             >
 
-                                {pickupBranchId
-                                    ? branchList.find(
-                                          (branch) =>
-                                              String(
-                                                  branch.id
-                                              ) ===
-                                              String(
-                                                  pickupBranchId
-                                              )
-                                      )?.name
-                                    : undefined}
+                                <SelectValue
+                                    placeholder="Select pickup branch"
+                                />
 
-                            </SelectValue>
+                            </SelectTrigger>
 
-                        </SelectTrigger>
+                            <SelectContent>
 
+                                {branchList.map(
+                                    (branch) => {
 
-                        <SelectContent>
-
-                            {branchList.map(
-                                (branch) => (
-
-                                    <SelectItem
-                                        key={
-                                            branch.id
-                                        }
-                                        value={
-                                            String(
+                                        const branchId =
+                                            normalizeId(
                                                 branch.id
-                                            )
-                                        }
-                                    >
+                                            );
 
-                                        {
-                                            branch.name
-                                        }
+                                        return (
 
-                                    </SelectItem>
+                                            <SelectItem
+                                                key={
+                                                    branchId
+                                                }
 
-                                )
-                            )}
+                                                value={
+                                                    branchId
+                                                }
+                                            >
+                                                {
+                                                    branch.name
+                                                }
+                                            </SelectItem>
 
-                        </SelectContent>
+                                        );
 
-                    </Select>
+                                    }
+                                )}
 
+                            </SelectContent>
+
+                        </Select>
+
+                    )}
 
                     <p className="error-text">
-                        {
-                            errors
-                                .pickup_branch_id
-                                ?.message
-                        }
+
+                        {rentalType ===
+                        "with_driver"
+                            ? errors.pickup_location?.message
+                            : errors.pickup_branch_id?.message}
+
                     </p>
 
                 </div>
 
 
                 {/* =================================================
-                    DROP BRANCH
+                    DROP
                 ================================================= */}
 
                 <div>
 
                     <label className="form-label">
-                        Drop Branch (optional)
+
+                        {rentalType ===
+                        "with_driver"
+                            ? "Drop Location"
+                            : "Drop Branch"}
+
                     </label>
 
 
-                    <Select
-                        key={
-                            `drop_branch-${defaultValues?.id ?? "new"}-${dropBranchId}`
-                        }
+                    {rentalType ===
+                    "with_driver" ? (
 
-                        value={
-                            dropBranchId ||
-                            ""
-                        }
+                        <input
+                            type="text"
 
-                        onValueChange={(
-                            value
-                        ) => {
+                            {...register(
+                                "drop_location"
+                            )}
 
-                            setValue(
-                                "drop_branch_id",
-                                value,
-                                {
-                                    shouldValidate:
-                                        true,
+                            className="form-input"
 
-                                    shouldDirty:
-                                        true,
+                            placeholder="Enter drop-off address"
+                        />
+
+                    ) : (
+
+                        <Select
+
+                            key={`drop-branch-${defaultValues?.id ?? "new"}-${dropBranchId}`}
+
+                            value={
+                                dropBranchId || ""
+                            }
+
+                            onValueChange={
+                                (value) => {
+
+                                    setValue(
+                                        "drop_branch_id",
+                                        value,
+                                        {
+                                            shouldValidate:
+                                                true,
+                                            shouldDirty:
+                                                true,
+                                        }
+                                    );
+
                                 }
-                            );
-
-                        }}
-                    >
-
-                        <SelectTrigger
-                            className="
-                                w-full
-                                h-11
-                                rounded-lg
-                                border-gray-300
-                            "
+                            }
                         >
 
-                            <SelectValue
-                                placeholder="
-                                    Same as pickup
+                            <SelectTrigger
+                                className="
+                                    w-full
+                                    h-11
+                                    rounded-lg
+                                    border-gray-300
                                 "
                             >
 
-                                {dropBranchId
-                                    ? branchList.find(
-                                          (branch) =>
-                                              String(
-                                                  branch.id
-                                              ) ===
-                                              String(
-                                                  dropBranchId
-                                              )
-                                      )?.name
-                                    : undefined}
+                                <SelectValue
+                                    placeholder="Select drop branch"
+                                />
 
-                            </SelectValue>
+                            </SelectTrigger>
 
-                        </SelectTrigger>
+                            <SelectContent>
 
+                                {branchList.map(
+                                    (branch) => {
 
-                        <SelectContent>
-
-                            {branchList.map(
-                                (branch) => (
-
-                                    <SelectItem
-                                        key={
-                                            branch.id
-                                        }
-                                        value={
-                                            String(
+                                        const branchId =
+                                            normalizeId(
                                                 branch.id
-                                            )
-                                        }
-                                    >
+                                            );
 
-                                        {
-                                            branch.name
-                                        }
+                                        return (
 
-                                    </SelectItem>
+                                            <SelectItem
+                                                key={
+                                                    branchId
+                                                }
 
-                                )
-                            )}
+                                                value={
+                                                    branchId
+                                                }
+                                            >
+                                                {
+                                                    branch.name
+                                                }
+                                            </SelectItem>
 
-                        </SelectContent>
+                                        );
 
-                    </Select>
+                                    }
+                                )}
 
+                            </SelectContent>
+
+                        </Select>
+
+                    )}
 
                     <p className="error-text">
-                        {
-                            errors
-                                .drop_branch_id
-                                ?.message
-                        }
+
+                        {rentalType ===
+                        "with_driver"
+                            ? errors.drop_location?.message
+                            : errors.drop_branch_id?.message}
+
                     </p>
 
                 </div>
@@ -1461,21 +1723,19 @@ const BookingForm = ({
                         Pickup Date &amp; Time
                     </label>
 
-
                     <input
                         type="datetime-local"
+
                         {...register(
                             "pickup_at"
                         )}
+
                         className="form-input"
                     />
 
-
                     <p className="error-text">
                         {
-                            errors
-                                .pickup_at
-                                ?.message
+                            errors.pickup_at?.message
                         }
                     </p>
 
@@ -1483,7 +1743,7 @@ const BookingForm = ({
 
 
                 {/* =================================================
-                    EXPECTED RETURN
+                    RETURN DATE
                 ================================================= */}
 
                 <div>
@@ -1492,21 +1752,19 @@ const BookingForm = ({
                         Expected Return
                     </label>
 
-
                     <input
                         type="datetime-local"
+
                         {...register(
                             "expected_return_at"
                         )}
+
                         className="form-input"
                     />
 
-
                     <p className="error-text">
                         {
-                            errors
-                                .expected_return_at
-                                ?.message
+                            errors.expected_return_at?.message
                         }
                     </p>
 
@@ -1514,7 +1772,7 @@ const BookingForm = ({
 
 
                 {/* =================================================
-                    QUOTED AMOUNT
+                    QUOTED
                 ================================================= */}
 
                 <div>
@@ -1523,22 +1781,20 @@ const BookingForm = ({
                         Quoted Amount
                     </label>
 
-
                     <input
                         type="number"
                         step="0.01"
+
                         {...register(
                             "quoted_amount"
                         )}
+
                         className="form-input"
                     />
 
-
                     <p className="error-text">
                         {
-                            errors
-                                .quoted_amount
-                                ?.message
+                            errors.quoted_amount?.message
                         }
                     </p>
 
@@ -1555,22 +1811,20 @@ const BookingForm = ({
                         Discount Amount
                     </label>
 
-
                     <input
                         type="number"
                         step="0.01"
+
                         {...register(
                             "discount_amount"
                         )}
+
                         className="form-input"
                     />
 
-
                     <p className="error-text">
                         {
-                            errors
-                                .discount_amount
-                                ?.message
+                            errors.discount_amount?.message
                         }
                     </p>
 
@@ -1578,7 +1832,7 @@ const BookingForm = ({
 
 
                 {/* =================================================
-                    FINAL AMOUNT
+                    FINAL
                 ================================================= */}
 
                 <div>
@@ -1587,14 +1841,16 @@ const BookingForm = ({
                         Final Amount
                     </label>
 
-
                     <input
                         type="number"
                         step="0.01"
+
                         {...register(
                             "final_amount"
                         )}
+
                         readOnly
+
                         className="
                             form-input
                             bg-gray-50
@@ -1603,12 +1859,9 @@ const BookingForm = ({
                         "
                     />
 
-
                     <p className="error-text">
                         {
-                            errors
-                                .final_amount
-                                ?.message
+                            errors.final_amount?.message
                         }
                     </p>
 
@@ -1625,25 +1878,24 @@ const BookingForm = ({
                         Customer Notes
                     </label>
 
-
                     <textarea
                         {...register(
                             "customer_notes"
                         )}
+
                         rows={3}
+
                         className="
                             form-input
                             resize-none
                         "
+
                         placeholder="Notes from the customer (optional)"
                     />
 
-
                     <p className="error-text">
                         {
-                            errors
-                                .customer_notes
-                                ?.message
+                            errors.customer_notes?.message
                         }
                     </p>
 
@@ -1660,25 +1912,24 @@ const BookingForm = ({
                         Admin Notes
                     </label>
 
-
                     <textarea
                         {...register(
                             "admin_notes"
                         )}
+
                         rows={3}
+
                         className="
                             form-input
                             resize-none
                         "
+
                         placeholder="Internal notes (optional)"
                     />
 
-
                     <p className="error-text">
                         {
-                            errors
-                                .admin_notes
-                                ?.message
+                            errors.admin_notes?.message
                         }
                     </p>
 
@@ -1703,14 +1954,17 @@ const BookingForm = ({
 
                 <button
                     type="button"
-                    onClick={onCancel}
+
+                    onClick={
+                        onCancel
+                    }
+
                     className="
                         px-5
                         py-2.5
                         rounded-lg
                         border
                         hover:bg-gray-50
-                        cursor-pointer
                     "
                 >
                     Cancel
@@ -1719,16 +1973,17 @@ const BookingForm = ({
 
                 <button
                     type="submit"
+
                     disabled={
                         isSubmitting ||
                         isLoading
                     }
+
                     className="
                         px-5
                         py-2.5
                         rounded-lg
                         bg-blue-600
-                        cursor-pointer
                         text-white
                         hover:bg-blue-700
                         disabled:opacity-50

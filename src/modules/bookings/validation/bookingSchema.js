@@ -1,52 +1,183 @@
 import { z } from "zod";
 
-export const bookingSchema = z.object({
-    customer_id: z.coerce
-        .number({ invalid_type_error: "Customer is required" })
-        .int()
-        .positive("Customer is required"),
+export const bookingSchema = z
+    .object({
 
-    vehicle_id: z.coerce
-        .number({ invalid_type_error: "Vehicle is required" })
-        .int()
-        .positive("Vehicle is required"),
+        customer_id: z.coerce
+            .number()
+            .int()
+            .positive("Customer is required"),
 
-    rental_type: z.enum(["self_drive", "with_driver"], {
-        errorMap: () => ({ message: "Select a rental type" }),
-    }),
+        vehicle_id: z.coerce
+            .number()
+            .int()
+            .positive("Vehicle is required"),
 
-    pickup_branch_id: z.coerce
-        .number({ invalid_type_error: "Pickup branch is required" })
-        .int()
-        .positive("Pickup branch is required"),
+        rental_type: z.enum(
+            [
+                "self_drive",
+                "with_driver",
+            ],
+            {
+                errorMap: () => ({
+                    message: "Select a rental type",
+                }),
+            }
+        ),
 
-    drop_branch_id: z
-        .string()
-        .optional()
-        .transform((val) => (val === "" || val === undefined ? undefined : Number(val)))
-        .refine((val) => val === undefined || (Number.isInteger(val) && val > 0), {
-            message: "Invalid drop branch",
-        }),
+        /* =================================================
+           SELF DRIVE FIELDS
+           Both required independently when
+           rental_type === "self_drive"
+           (enforced in superRefine below)
+        ================================================= */
 
-    pickup_at: z.string().min(1, "Pickup date/time is required"),
+        pickup_branch_id: z
+            .union([
+                z.literal(""),
+                z.coerce.number().int().positive(),
+            ])
+            .optional(),
 
-    expected_return_at: z.string().min(1, "Expected return date/time is required"),
+        drop_branch_id: z
+            .union([
+                z.literal(""),
+                z.coerce.number().int().positive(),
+            ])
+            .optional(),
 
-    quoted_amount: z.coerce
-        .number({ invalid_type_error: "Quoted amount is required" })
-        .min(0, "Amount cannot be negative"),
+        /* =================================================
+           WITH DRIVER FIELDS
+           Required only when rental_type === "with_driver"
+           (enforced in superRefine below)
+        ================================================= */
 
-    discount_amount: z.coerce
-        .number()
-        .min(0, "Discount cannot be negative")
-        .optional()
-        .default(0),
+        pickup_location: z
+            .string()
+            .trim()
+            .optional()
+            .or(z.literal("")),
 
-    final_amount: z.coerce
-        .number()
-        .min(0, "Final amount cannot be negative")
-        .optional(),
+        drop_location: z
+            .string()
+            .trim()
+            .optional()
+            .or(z.literal("")),
 
-    customer_notes: z.string().trim().optional().or(z.literal("")),
-    admin_notes: z.string().trim().optional().or(z.literal("")),
-});
+        pickup_at: z
+            .string()
+            .min(
+                1,
+                "Pickup date/time is required"
+            ),
+
+        expected_return_at: z
+            .string()
+            .min(
+                1,
+                "Expected return date/time is required"
+            ),
+
+        quoted_amount: z.coerce
+            .number()
+            .min(
+                0,
+                "Amount cannot be negative"
+            ),
+
+        discount_amount: z.coerce
+            .number()
+            .min(
+                0,
+                "Discount cannot be negative"
+            )
+            .default(0),
+
+        final_amount: z.coerce
+            .number()
+            .min(
+                0,
+                "Final amount cannot be negative"
+            )
+            .optional(),
+
+        customer_notes: z
+            .string()
+            .trim()
+            .optional()
+            .or(z.literal("")),
+
+        admin_notes: z
+            .string()
+            .trim()
+            .optional()
+            .or(z.literal("")),
+    })
+
+    /* =========================================================
+       CONDITIONAL RULES BASED ON RENTAL TYPE
+
+       self_drive:
+         - pickup_branch_id required
+         - drop_branch_id required
+           (independently chosen — no auto-sync/mirroring)
+
+       with_driver:
+         - pickup_location required
+         - drop_location required
+    ========================================================= */
+
+    .superRefine((data, ctx) => {
+
+        if (data.rental_type === "self_drive") {
+
+            if (
+                data.pickup_branch_id === "" ||
+                data.pickup_branch_id === undefined ||
+                data.pickup_branch_id === null
+            ) {
+
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: ["pickup_branch_id"],
+                    message: "Pickup branch is required",
+                });
+            }
+
+            if (
+                data.drop_branch_id === "" ||
+                data.drop_branch_id === undefined ||
+                data.drop_branch_id === null
+            ) {
+
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: ["drop_branch_id"],
+                    message: "Drop branch is required",
+                });
+            }
+        }
+
+        if (data.rental_type === "with_driver") {
+
+            if (!data.pickup_location?.trim()) {
+
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: ["pickup_location"],
+                    message:
+                        "Pickup location is required for with-driver rentals",
+                });
+            }
+
+            if (!data.drop_location?.trim()) {
+
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: ["drop_location"],
+                    message:
+                        "Drop location is required for with-driver rentals",
+                });
+            }
+        }
+    });
