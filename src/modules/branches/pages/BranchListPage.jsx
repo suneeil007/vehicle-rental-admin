@@ -8,6 +8,7 @@ import BranchColumns from "../components/BranchColumns";
 import BranchTable from "../components/BranchTable";
 import DeleteBranchDialog from "../components/DeleteBranchDialog";
 import useDocumentTitle from "@/app/hooks/useDocumentTitle";
+import BranchToolbar from "../components/BranchToolbar";
 
 const BranchListPage = () => {
     useDocumentTitle("Branches");
@@ -32,21 +33,8 @@ const BranchListPage = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-xl font-bold text-gray-600">Branches</h1>
-                    <p className="text-gray-500 text-sm">Manage rental branch locations</p>
-                </div>
-
-                <button
-                    type="button"
-                    onClick={() => navigate("/branches/create")}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
-                >
-                    <Plus className="h-4 w-4" />
-                    Add Branch
-                </button>
-            </div>
+            
+            <BranchToolbar />
 
             <BranchTable branches={branches ?? []} columns={columns} loading={isLoading} />
 

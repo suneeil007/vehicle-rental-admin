@@ -72,7 +72,7 @@ const BranchColumns = ({ onEdit, onDelete }) => [
         id: "actions",
         header: () => <div className="text-right">Actions</div>,
         cell: ({ row }) => (
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-start gap-2">
                 <button
                     type="button"
                     onClick={() => onEdit(row.original)}

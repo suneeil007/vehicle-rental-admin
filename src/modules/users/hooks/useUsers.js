@@ -8,6 +8,8 @@ const useUsers = () => {
         queryFn: async()=>{
             const response = await getUsers();
             // console.log("Users API:", response.data);
+            // console.log("USERS API RESPONSE:", response.data);
+            // console.log("USERS ARRAY:", response.data.data);
             return response.data.data;
         }
     });
