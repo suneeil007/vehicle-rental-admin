@@ -82,7 +82,7 @@ const BranchForm = ({ defaultValues, onSubmit, onCancel, isLoading = false }) =>
     return (
         <form
             onSubmit={handleSubmit(onSubmit)}
-            className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-6"
+            className="bg-white border-gray-200 rounded-xl shadow-sm p-6 space-y-6"
         >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 

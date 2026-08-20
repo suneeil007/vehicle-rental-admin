@@ -212,7 +212,6 @@ const UserForm = ({
             {/* ACCOUNT INFO */}
             <div className="
                     bg-white
-                    border
                     border-gray-200
                     rounded-xl
                     shadow-sm
@@ -424,7 +423,6 @@ const UserForm = ({
             {/* PERSONAL / PROFILE INFO */}
             <div className="
                 bg-white
-                border
                 border-gray-200
                 rounded-xl
                 shadow-sm
@@ -568,7 +566,6 @@ const UserForm = ({
             {showDriverSection && (
                 <div className="
                     bg-white
-                    border
                     border-gray-200
                     rounded-xl
                     shadow-sm
@@ -660,8 +657,6 @@ const UserForm = ({
             {/* EMERGENCY CONTACT */}
             <div className="
                 bg-white
-                border
-                border-gray-200
                 rounded-xl
                 shadow-sm
                 p-6
@@ -699,8 +694,6 @@ const UserForm = ({
             {showAdminSection && (
                 <div className="
                     bg-white
-                    border
-                    border-gray-200
                     rounded-xl
                     shadow-sm
                     p-6
@@ -725,7 +718,6 @@ const UserForm = ({
                     justify-end
                     gap-3
                     bg-white
-                    border
                     border-gray-200
                     rounded-xl
                     shadow-sm

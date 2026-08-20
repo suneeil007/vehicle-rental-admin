@@ -10,11 +10,19 @@ import "./index.css";
 
 import { Toaster } from "sonner";
 
+import { ThemeProvider } from "./components/theme/ThemeProvider";
+
 createRoot(document.getElementById("root")).render(
     <StrictMode>
         <QueryClientProvider client={queryClient}>
-            <App />
-            <Toaster richColors position="top-right" />
+            <ThemeProvider>
+                <App />
+
+                <Toaster
+                    richColors
+                    position="top-right"
+                />
+            </ThemeProvider>
         </QueryClientProvider>
     </StrictMode>
 );
