@@ -66,6 +66,24 @@ export const menus = [
             {
                 title: "Payments",
                 path: "/payments",
+                children: [
+                    {
+                        title: "All Payments",
+                        path: "/payments",
+                    },
+                    {
+                        title: "Advance & Deposits",
+                        path: "/payments?type=advance,deposit",
+                    },
+                    {
+                        title: "Final Settlements",
+                        path: "/payments?type=final",
+                    },
+                    {
+                        title: "Refunds",
+                        path: "/payments?type=refund",
+                    },
+                ],
             },
             {
                 title: "Invoices",

@@ -22,6 +22,7 @@ const BookingTable = ({
     bookings = [],
     columns = [],
     loading = false,
+    toolbarRight = null,
 }) => {
     const [sorting, setSorting] = useState([]);
     const [globalFilter, setGlobalFilter] = useState("");
@@ -42,12 +43,16 @@ const BookingTable = ({
     return (
         <div className="space-y-5">
 
-            <input
-                value={globalFilter ?? ""}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                placeholder="Search bookings..."
-                className="border rounded-lg px-4 py-2 w-full bg-white md:w-96"
-            />
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <input
+                    value={globalFilter ?? ""}
+                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    placeholder="Search trips..."
+                    className="border rounded-lg px-4 py-2 w-full bg-white md:w-96"
+                />
+
+                {toolbarRight}
+            </div>
 
             <div className="border rounded-xl overflow-hidden bg-white">
                 <Table>

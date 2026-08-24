@@ -31,6 +31,7 @@ import useGenerateInvoice from "../hooks/useGenerateInvoice";
 
 import CompleteTripDialog from "../components/CompleteTripDialog";
 import CancelTripDialog from "../components/CancelTripDialog";
+import TripPaymentPanel from "../components/TrippaymentPanel";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -503,6 +504,9 @@ const TripDetailPage = () => {
                     </Card>
 
                 </div>
+
+                {/* PAYMENTS */}
+                <TripPaymentPanel trip={trip} />
 
                 {/* CANCELLATION */}
                 {trip.status === "cancelled" && (

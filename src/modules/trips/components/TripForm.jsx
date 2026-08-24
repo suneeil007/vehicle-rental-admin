@@ -36,7 +36,6 @@ import { tripSchema } from "../validation/tripSchema";
 import useUsers from "../../users/hooks/useUsers";
 import useVehicles from "../../vehicles/hooks/useVehicles";
 import useBranches from "../../branches/hooks/useBranches";
-
 import { createUser } from "@/modules/users/api/userApi";
 
 
@@ -125,6 +124,7 @@ const getId = (value) => {
     if (typeof value === "object") {
         return (
             value.id ??
+            value.user_id ??
             value.branch_id ??
             value.vehicle_id ??
             value.customer_id ??
@@ -219,24 +219,6 @@ const normalizeFuelLevel = (value) => {
         return "";
     }
 
-    /*
-     * Handle API response like:
-     *
-     * "full"
-     *
-     * OR
-     *
-     * {
-     *    value: "full"
-     * }
-     *
-     * OR
-     *
-     * {
-     *    name: "Full"
-     * }
-     */
-
     if (typeof value === "object") {
         value =
             value.value ??
@@ -253,16 +235,12 @@ const normalizeFuelLevel = (value) => {
         .toLowerCase()
         .replace(/[\s-]+/g, "_");
 
-    /* ================= EMPTY ================= */
-
     if (
         normalized === "empty" ||
         normalized === "0"
     ) {
         return "empty";
     }
-
-    /* ================= QUARTER ================= */
 
     if (
         normalized === "quarter" ||
@@ -274,8 +252,6 @@ const normalizeFuelLevel = (value) => {
         return "quarter";
     }
 
-    /* ================= HALF ================= */
-
     if (
         normalized === "half" ||
         normalized === "1/2" ||
@@ -284,8 +260,6 @@ const normalizeFuelLevel = (value) => {
     ) {
         return "half";
     }
-
-    /* ================= THREE QUARTER ================= */
 
     if (
         normalized === "three_quarter" ||
@@ -296,8 +270,6 @@ const normalizeFuelLevel = (value) => {
     ) {
         return "three_quarter";
     }
-
-    /* ================= FULL ================= */
 
     if (
         normalized === "full" ||
@@ -344,13 +316,27 @@ const TripForm = ({
         ? branches
         : [];
 
+
+    const getRoleId = (user) => {
+        return Number(
+            user?.role_id ??
+            user?.role?.id ??
+            user?.role?.role_id ??
+            ""
+        );
+    };
+
+
     const customers = allUsers.filter(
-        (user) => Number(user.role_id) === 5
+        (user) => getRoleId(user) === 5
     );
 
     const drivers = allUsers.filter(
-        (user) => Number(user.role_id) === 6
+        (user) => getRoleId(user) === 6
     );
+
+// console.log("TOTAL allUsers LENGTH:", allUsers.length);
+// console.log("ALL DRIVER-ROLE USERS:", allUsers.filter(u => getRoleId(u) === 6));
 
 
     /* =====================================================
@@ -359,6 +345,37 @@ const TripForm = ({
 
     const [customerSearch, setCustomerSearch] = useState("");
     const [creatingCustomer, setCreatingCustomer] = useState(false);
+
+     /* =====================================================
+       ENSURE CURRENTLY ASSIGNED CUSTOMER/DRIVER ARE ALWAYS
+       IN THE LIST, EVEN IF THE ROLE FILTER MISSES THEM
+    ===================================================== */
+
+    const customersWithFallback = (() => {
+        const currentCustomer = defaultValues?.customer;
+        if (
+            currentCustomer?.id &&
+            !customers.some(
+                (c) => normalizeId(c.id) === normalizeId(currentCustomer.id)
+            )
+        ) {
+            return [currentCustomer, ...customers];
+        }
+        return customers;
+    })();
+
+    const driversWithFallback = (() => {
+        const currentDriver = defaultValues?.driver;
+        if (
+            currentDriver?.id &&
+            !drivers.some(
+                (d) => normalizeId(d.id) === normalizeId(currentDriver.id)
+            )
+        ) {
+            return [currentDriver, ...drivers];
+        }
+        return drivers;
+    })();
 
 
     /* =====================================================
@@ -396,15 +413,11 @@ const TripForm = ({
             pickup_at: "",
             expected_return_at: "",
 
-            /* Vehicle Condition */
-
             pickup_odometer: "0",
             return_odometer: "",
 
             pickup_fuel: "",
             return_fuel: "",
-
-            /* Billing */
 
             base_amount: "",
             extra_km_charge: "0",
@@ -463,6 +476,10 @@ const TripForm = ({
 
     /* =====================================================
        POPULATE EDIT DATA
+
+       IMPORTANT:
+       Customer and Driver are populated directly through
+       reset(), exactly like Rental Type and Fuel.
     ===================================================== */
 
     useEffect(() => {
@@ -471,12 +488,54 @@ const TripForm = ({
             return;
         }
 
-        /*
-         * IMPORTANT:
-         *
-         * Fuel is normalized here exactly like
-         * rental_type.
-         */
+
+        /* =================================================
+           CUSTOMER ID
+        ================================================= */
+
+       const normalizedCustomerId = normalizeId(
+                defaultValues.customer_id ??
+                defaultValues.customer?.id ??
+                defaultValues.customer?.user_id ??
+                defaultValues.customer?.customer_id
+            );
+
+
+
+        /* =================================================
+           DRIVER ID
+        ================================================= */
+
+        const normalizedDriverId = normalizeId(
+            defaultValues.driver_id ??
+            defaultValues.driver?.id ??
+            defaultValues.driver?.user_id ??
+            defaultValues.driver?.driver_id
+        );
+
+
+        /* =================================================
+           VEHICLE ID
+        ================================================= */
+
+        const normalizedVehicleId = normalizeId(
+            defaultValues.vehicle_id ??
+            defaultValues.vehicle?.id
+        );
+
+
+        /* =================================================
+           RENTAL TYPE
+        ================================================= */
+
+        const normalizedRentalType = normalizeRentalType(
+            defaultValues.rental_type
+        );
+
+
+        /* =================================================
+           FUEL
+        ================================================= */
 
         const normalizedPickupFuel =
             normalizeFuelLevel(
@@ -492,52 +551,61 @@ const TripForm = ({
                 defaultValues.return_fuel_level
             );
 
-        console.log(
-            "TRIP EDIT - pickup fuel:",
-            defaultValues.pickup_fuel,
-            "=>",
-            normalizedPickupFuel
-        );
 
-        console.log(
-            "TRIP EDIT - return fuel:",
-            defaultValues.return_fuel,
-            "=>",
-            normalizedReturnFuel
-        );
+        // console.log(
+        //     "TRIP EDIT CUSTOMER:",
+        //     defaultValues.customer_id,
+        //     defaultValues.customer,
+        //     "=>",
+        //     normalizedCustomerId
+        // );
+
+        // console.log(
+        //     "TRIP EDIT DRIVER:",
+        //     defaultValues.driver_id,
+        //     defaultValues.driver,
+        //     "=>",
+        //     normalizedDriverId
+        // );
+
+        // console.log(
+        //     "TRIP EDIT RENTAL TYPE:",
+        //     defaultValues.rental_type,
+        //     "=>",
+        //     normalizedRentalType
+        // );
+
+        // console.log(
+        //     "TRIP EDIT PICKUP FUEL:",
+        //     defaultValues.pickup_fuel,
+        //     "=>",
+        //     normalizedPickupFuel
+        // );
 
 
         const values = {
 
             /* ================= CUSTOMER ================= */
 
-            customer_id: normalizeId(
-                defaultValues.customer_id ??
-                defaultValues.customer?.id
-            ),
+            customer_id: normalizedCustomerId,
+            customer: defaultValues.customer,   
 
 
             /* ================= VEHICLE ================= */
 
-            vehicle_id: normalizeId(
-                defaultValues.vehicle_id ??
-                defaultValues.vehicle?.id
-            ),
+            vehicle_id: normalizedVehicleId,
+            vehicle: defaultValues.vehicle,   
 
 
             /* ================= RENTAL TYPE ================= */
 
-            rental_type: normalizeRentalType(
-                defaultValues.rental_type
-            ),
+            rental_type: normalizedRentalType,
 
 
             /* ================= DRIVER ================= */
 
-            driver_id: normalizeId(
-                defaultValues.driver_id ??
-                defaultValues.driver?.id
-            ),
+            driver_id: normalizedDriverId,
+            driver: defaultValues.driver, 
 
 
             /* ================= BRANCH ================= */
@@ -575,9 +643,7 @@ const TripForm = ({
                 ),
 
 
-            /* =================================================
-               VEHICLE CONDITION
-            ================================================= */
+            /* ================= VEHICLE CONDITION ================= */
 
             pickup_odometer:
                 defaultValues.pickup_odometer !== null &&
@@ -591,11 +657,6 @@ const TripForm = ({
                     ? String(defaultValues.return_odometer)
                     : "",
 
-
-            /*
-             * THIS IS THE IMPORTANT FIX
-             */
-
             pickup_fuel:
                 normalizedPickupFuel,
 
@@ -603,9 +664,7 @@ const TripForm = ({
                 normalizedReturnFuel,
 
 
-            /* =================================================
-               BILLING
-            ================================================= */
+            /* ================= BILLING ================= */
 
             base_amount:
                 defaultValues.base_amount !== null &&
@@ -645,10 +704,10 @@ const TripForm = ({
         };
 
 
-        console.log(
-            "TRIP EDIT FORM VALUES:",
-            values
-        );
+        // console.log(
+        //     "TRIP EDIT FORM VALUES:",
+        //     values
+        // );
 
 
         reset(values);
@@ -888,9 +947,7 @@ const TripForm = ({
                     : data.drop_location?.trim() || null,
 
 
-            /* =================================================
-               VEHICLE CONDITION
-            ================================================= */
+            /* ================= VEHICLE CONDITION ================= */
 
             pickup_odometer:
                 Number(data.pickup_odometer),
@@ -903,10 +960,6 @@ const TripForm = ({
                     : null,
 
 
-            /*
-             * Keep the exact values expected by backend.
-             */
-
             pickup_fuel:
                 normalizeFuelLevel(
                     data.pickup_fuel
@@ -918,9 +971,7 @@ const TripForm = ({
                 ) || null,
 
 
-            /* =================================================
-               BILLING
-            ================================================= */
+            /* ================= BILLING ================= */
 
             base_amount:
                 Number(data.base_amount),
@@ -988,7 +1039,14 @@ const TripForm = ({
                         Customer
                     </label>
 
-                    <Popover>
+
+                    <Popover
+                        key={`
+                            customer-
+                            ${defaultValues?.id ?? "new"}-
+                            ${customerId}
+                        `}
+                    >
 
                         <PopoverTrigger asChild>
 
@@ -1010,7 +1068,7 @@ const TripForm = ({
 
                                     {customerId
                                         ? (
-                                            customers.find(
+                                            customersWithFallback.find(
                                                 (customer) =>
                                                     normalizeId(
                                                         customer.id
@@ -1025,6 +1083,7 @@ const TripForm = ({
                                         : "Select customer"}
 
                                 </span>
+
 
                                 <ChevronsUpDown
                                     className="
@@ -1060,10 +1119,11 @@ const TripForm = ({
                                     }
                                 />
 
+
                                 <CommandList>
 
                                     {customerSearch.trim() &&
-                                        !customers.some(
+                                        !customersWithFallback.some(
                                             (customer) =>
                                                 `${customer.name || ""} ${customer.email || ""}`
                                                     .toLowerCase()
@@ -1130,7 +1190,7 @@ const TripForm = ({
 
                                     <CommandGroup>
 
-                                        {customers.map(
+                                        {customersWithFallback.map(
                                             (customer) => (
 
                                                 <CommandItem
@@ -1138,11 +1198,14 @@ const TripForm = ({
                                                     value={`${customer.name} ${customer.email || ""}`}
                                                     onSelect={() => {
 
+                                                        const selectedCustomerId =
+                                                            normalizeId(
+                                                                customer.id
+                                                            );
+
                                                         setValue(
                                                             "customer_id",
-                                                            String(
-                                                                customer.id
-                                                            ),
+                                                            selectedCustomerId,
                                                             {
                                                                 shouldValidate:
                                                                     true,
@@ -1217,6 +1280,7 @@ const TripForm = ({
                     <label className="form-label">
                         Vehicle
                     </label>
+
 
                     <Popover>
 
@@ -1380,6 +1444,7 @@ const TripForm = ({
                         Rental Type
                     </label>
 
+
                     <Select
                         key={`
                             rental-type-
@@ -1447,6 +1512,7 @@ const TripForm = ({
                             Driver
                         </label>
 
+
                         <Select
                             key={`
                                 driver-
@@ -1488,24 +1554,17 @@ const TripForm = ({
 
                             </SelectTrigger>
 
-
                             <SelectContent>
-
-                                {drivers.map(
+                                {driversWithFallback.map(
                                     (driver) => (
-
                                         <SelectItem
                                             key={driver.id}
-                                            value={normalizeId(
-                                                driver.id
-                                            )}
+                                            value={normalizeId(driver.id)}
                                         >
                                             {driver.name}
                                         </SelectItem>
-
                                     )
                                 )}
-
                             </SelectContent>
 
                         </Select>
@@ -1828,8 +1887,6 @@ const TripForm = ({
                             "
                         >
 
-                            {/* PICKUP ODOMETER */}
-
                             <div>
 
                                 <label className="form-label">
@@ -1855,8 +1912,6 @@ const TripForm = ({
 
                             </div>
 
-
-                            {/* RETURN ODOMETER */}
 
                             <div>
 
@@ -1884,10 +1939,6 @@ const TripForm = ({
 
                             </div>
 
-
-                            {/* =================================================
-                               PICKUP FUEL
-                            ================================================= */}
 
                             <div>
 
@@ -1971,10 +2022,6 @@ const TripForm = ({
 
                             </div>
 
-
-                            {/* =================================================
-                               RETURN FUEL
-                            ================================================= */}
 
                             <div>
 
@@ -2100,8 +2147,6 @@ const TripForm = ({
                             "
                         >
 
-                            {/* BASE AMOUNT */}
-
                             <div>
 
                                 <label className="form-label">
@@ -2127,8 +2172,6 @@ const TripForm = ({
 
                             </div>
 
-
-                            {/* EXTRA KM */}
 
                             <div>
 
@@ -2158,8 +2201,6 @@ const TripForm = ({
                             </div>
 
 
-                            {/* LATE RETURN */}
-
                             <div>
 
                                 <label className="form-label">
@@ -2188,8 +2229,6 @@ const TripForm = ({
                             </div>
 
 
-                            {/* DAMAGE */}
-
                             <div>
 
                                 <label className="form-label">
@@ -2217,8 +2256,6 @@ const TripForm = ({
 
                             </div>
 
-
-                            {/* FUEL CHARGE */}
 
                             <div>
 
@@ -2249,8 +2286,6 @@ const TripForm = ({
 
                         </div>
 
-
-                        {/* TOTAL */}
 
                         <div
                             className="

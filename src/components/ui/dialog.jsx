@@ -60,6 +60,7 @@ const DialogContent = React.forwardRef(
                 <DialogPrimitive.Close
                     className="
                         absolute right-4 top-4
+                        cursor-pointer
                         rounded-sm opacity-70
                         ring-offset-background
                         transition-opacity
@@ -141,6 +142,7 @@ const DialogDescription = React.forwardRef(
 
 DialogDescription.displayName =
     DialogPrimitive.Description.displayName;
+    
 
 export {
     Dialog,

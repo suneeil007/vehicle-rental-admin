@@ -1,5 +1,7 @@
 import bookingRoutes from "@/modules/bookings/bookingRoutes";
 import branchRoutes from "@/modules/branches/branchRoutes";
+import invoiceRoutes from "@/modules/invoices/invoiceRoutes";
+import paymentRoutes from "@/modules/payments/paymentRoutes";
 import TripRoutes from "@/modules/trips/TripRoutes";
 import userRoutes from "@/modules/users/userRoutes";
 import vehicleCategoryRoutes from "@/modules/vehicleCategories/vehicleCategoryRoutes";
@@ -12,6 +14,8 @@ const moduleRoutes = [
     ...branchRoutes,
     ...bookingRoutes,
     ...TripRoutes,
+    ...paymentRoutes,
+    ...invoiceRoutes,
 ];
 
 export default moduleRoutes;

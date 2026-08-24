@@ -73,7 +73,7 @@ const CompleteTripDialog = ({ trip, open, onOpenChange }) => {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Complete Trip</DialogTitle>
                 </DialogHeader>
@@ -83,15 +83,19 @@ const CompleteTripDialog = ({ trip, open, onOpenChange }) => {
                         onSubmit={form.handleSubmit(handleSubmit)}
                         className="space-y-4"
                     >
+                        
                         <FormField
                             control={form.control}
                             name="actual_return_at"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Actual Return At</FormLabel>
+                                    <FormLabel className="text-xs">
+                                        Actual Return At
+                                    </FormLabel>
                                     <FormControl>
                                         <Input
                                             type="datetime-local"
+                                            className="h-8 text-sm"
                                             {...field}
                                         />
                                     </FormControl>
@@ -100,19 +104,20 @@ const CompleteTripDialog = ({ trip, open, onOpenChange }) => {
                             )}
                         />
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-4">
                             <FormField
                                 control={form.control}
                                 name="return_odometer"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>
+                                        <FormLabel className="text-xs">
                                             Return Odometer (km)
                                         </FormLabel>
                                         <FormControl>
                                             <Input
                                                 type="number"
                                                 min={trip?.pickup_odometer ?? 0}
+                                                className="h-8 text-sm"
                                                 {...field}
                                             />
                                         </FormControl>
@@ -126,13 +131,15 @@ const CompleteTripDialog = ({ trip, open, onOpenChange }) => {
                                 name="return_fuel"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Return Fuel</FormLabel>
+                                        <FormLabel className="text-xs">
+                                            Return Fuel
+                                        </FormLabel>
                                         <Select
                                             onValueChange={field.onChange}
                                             value={field.value}
                                         >
                                             <FormControl>
-                                                <SelectTrigger>
+                                                <SelectTrigger className="!h-8 w-full text-sm">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                             </FormControl>
@@ -151,20 +158,21 @@ const CompleteTripDialog = ({ trip, open, onOpenChange }) => {
                                     </FormItem>
                                 )}
                             />
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
                                 name="extra_km_charge"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Extra KM Charge</FormLabel>
+                                        <FormLabel className="text-xs">
+                                            Extra KM Charge
+                                        </FormLabel>
                                         <FormControl>
                                             <Input
                                                 type="number"
                                                 min="0"
                                                 step="0.01"
+                                                className="h-8 text-sm"
                                                 {...field}
                                             />
                                         </FormControl>
@@ -172,13 +180,15 @@ const CompleteTripDialog = ({ trip, open, onOpenChange }) => {
                                     </FormItem>
                                 )}
                             />
+                        </div>
 
+                        <div className="grid grid-cols-3 gap-4">
                             <FormField
                                 control={form.control}
                                 name="late_return_charge"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>
+                                        <FormLabel className="text-xs">
                                             Late Return Charge
                                         </FormLabel>
                                         <FormControl>
@@ -186,6 +196,7 @@ const CompleteTripDialog = ({ trip, open, onOpenChange }) => {
                                                 type="number"
                                                 min="0"
                                                 step="0.01"
+                                                className="h-8 text-sm"
                                                 {...field}
                                             />
                                         </FormControl>
@@ -199,12 +210,15 @@ const CompleteTripDialog = ({ trip, open, onOpenChange }) => {
                                 name="damage_charge"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Damage Charge</FormLabel>
+                                        <FormLabel className="text-xs">
+                                            Damage Charge
+                                        </FormLabel>
                                         <FormControl>
                                             <Input
                                                 type="number"
                                                 min="0"
                                                 step="0.01"
+                                                className="h-8 text-sm"
                                                 {...field}
                                             />
                                         </FormControl>
@@ -218,12 +232,15 @@ const CompleteTripDialog = ({ trip, open, onOpenChange }) => {
                                 name="fuel_charge"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Fuel Charge</FormLabel>
+                                        <FormLabel className="text-xs">
+                                            Fuel Charge
+                                        </FormLabel>
                                         <FormControl>
                                             <Input
                                                 type="number"
                                                 min="0"
                                                 step="0.01"
+                                                className="h-8 text-sm"
                                                 {...field}
                                             />
                                         </FormControl>
@@ -238,9 +255,15 @@ const CompleteTripDialog = ({ trip, open, onOpenChange }) => {
                             name="return_notes"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Return Notes</FormLabel>
+                                    <FormLabel className="text-xs">
+                                        Return Notes
+                                    </FormLabel>
                                     <FormControl>
-                                        <Textarea rows={2} {...field} />
+                                        <Textarea
+                                            rows={2}
+                                            className="text-sm"
+                                            {...field}
+                                        />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -252,9 +275,15 @@ const CompleteTripDialog = ({ trip, open, onOpenChange }) => {
                             name="damage_notes"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Damage Notes</FormLabel>
+                                    <FormLabel className="text-xs">
+                                        Damage Notes
+                                    </FormLabel>
                                     <FormControl>
-                                        <Textarea rows={2} {...field} />
+                                        <Textarea
+                                            rows={2}
+                                            className="text-sm"
+                                            {...field}
+                                        />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -266,12 +295,14 @@ const CompleteTripDialog = ({ trip, open, onOpenChange }) => {
                                 type="button"
                                 variant="outline"
                                 onClick={() => onOpenChange(false)}
+                                className="cursor-pointer"
                             >
                                 Cancel
                             </Button>
                             <Button
                                 type="submit"
                                 disabled={completeTrip.isPending}
+                                className="cursor-pointer bg-green-700 hover:bg-green-800"
                             >
                                 {completeTrip.isPending
                                     ? "Completing..."

@@ -1,9 +1,9 @@
-import { Link } from "react-router-dom";
+import { useMemo, useState } from "react";
 import useTrips from "../hooks/useTrips";
 import { tripColumns } from "../components/TripColumns";
-import { Button } from "@/components/ui/button";
 import TripTable from "../components/TripTable";
 import TripToolbar from "../components/TripToolbar";
+import TripStatusBadges from "../components/TripStatusBadges";
 
 const TripListPage = () => {
     const {
@@ -11,6 +11,15 @@ const TripListPage = () => {
         isLoading,
         isError,
     } = useTrips();
+
+    const [activeStatus, setActiveStatus] = useState("");
+
+    const allTrips = trips ?? [];
+
+    const filteredTrips = useMemo(() => {
+        if (!activeStatus) return allTrips;
+        return allTrips.filter((trip) => trip.status === activeStatus);
+    }, [allTrips, activeStatus]);
 
     return (
         <div className="space-y-4">
@@ -24,8 +33,15 @@ const TripListPage = () => {
 
             <TripTable
                 columns={tripColumns}
-                trips={trips ?? []}
+                trips={filteredTrips}
                 loading={isLoading}
+                toolbarRight={
+                    <TripStatusBadges
+                        trips={allTrips}
+                        activeStatus={activeStatus}
+                        onSelect={setActiveStatus}
+                    />
+                }
             />
         </div>
     );

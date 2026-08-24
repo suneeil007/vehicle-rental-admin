@@ -1,9 +1,8 @@
 import api from "../../../app/services/api";
 
 export const getUsers = () => {
-        return api.get("/users");
+        return api.get("/users?per_page=1000");
     };
-
 
 export const getUser = (slug) => {
         return api.get(`/users/${slug}`);

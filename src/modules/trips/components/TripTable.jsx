@@ -18,10 +18,16 @@ import {
     TableRow,
 } from "@/components/ui/table";
 
+/**
+ * @param {Object} props
+ * @param {React.ReactNode} [props.toolbarRight] - extra content rendered
+ *   to the right of the search input (e.g. status filter badges)
+ */
 const TripTable = ({
     trips = [],
     columns = [],
     loading = false,
+    toolbarRight = null,
 }) => {
     const [sorting, setSorting] = useState([]);
     const [globalFilter, setGlobalFilter] = useState("");
@@ -42,12 +48,16 @@ const TripTable = ({
     return (
         <div className="space-y-5">
 
-            <input
-                value={globalFilter ?? ""}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                placeholder="Search trips..."
-                className="border rounded-lg px-4 py-2 w-full bg-white md:w-96"
-            />
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <input
+                    value={globalFilter ?? ""}
+                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    placeholder="Search trips..."
+                    className="border rounded-lg px-4 py-2 w-full bg-white md:w-96"
+                />
+
+                {toolbarRight}
+            </div>
 
             <div className="border rounded-xl overflow-hidden bg-white">
                 <Table>
