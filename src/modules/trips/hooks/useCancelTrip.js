@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { submitCancelTrip } from "../services/tripService";
 import { tripKeys } from "../api/tripKeys";
+import { vehicleKeys } from "../../vehicles/api/vehicleKeys";
 
 const useCancelTrip = () => {
     const queryClient = useQueryClient();
@@ -13,6 +14,14 @@ const useCancelTrip = () => {
             queryClient.invalidateQueries({
                 queryKey: tripKeys.detail(variables.trip),
             });
+
+            /*
+            | Cancelling a trip frees the vehicle back to available -
+            | invalidate the vehicle module's cache too, or the
+            | Vehicle list page keeps showing stale status.
+            */
+            queryClient.invalidateQueries({ queryKey: vehicleKeys.all });
+
             toast.success("Trip cancelled successfully.");
         },
         onError: (error) => {

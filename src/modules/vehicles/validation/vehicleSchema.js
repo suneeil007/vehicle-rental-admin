@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const vehicleSchema = (isEdit = false) =>
+export const vehicleSchema = (isEdit = false, isSystemManagedStatus = false) =>
     z.object({
         vehicle_category_id: z
             .string()
@@ -77,7 +77,21 @@ export const vehicleSchema = (isEdit = false) =>
             .optional()
             .or(z.literal("")),
 
-        status: z.enum(["available", "booked", "maintenance", "inactive"], {
-            errorMap: () => ({ message: "Select a status" }),
-        }),
+        /*
+        |--------------------------------------------------------------------------
+        | Status
+        |--------------------------------------------------------------------------
+        |
+        | "booked" and "on_trip" are system-managed statuses set
+        | automatically by the Trip module. An admin can only ever
+        | submit available, maintenance, or inactive from this form -
+        | this mirrors the backend's Store/UpdateVehicleRequest rule.
+        |
+        */
+
+        status: isSystemManagedStatus
+            ? z.string()
+            : z.enum(["available", "maintenance", "inactive"], {
+                  errorMap: () => ({ message: "Select a status" }),
+              }),
     });

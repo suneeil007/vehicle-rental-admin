@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
@@ -19,14 +19,6 @@ import {
 } from "@/components/ui/command";
 
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-
-import {
     Check,
     ChevronsUpDown,
 } from "lucide-react";
@@ -36,6 +28,7 @@ import { bookingSchema } from "../validation/bookingSchema";
 import useUsers from "../../users/hooks/useUsers";
 import useVehicles from "../../vehicles/hooks/useVehicles";
 import useBranches from "../../branches/hooks/useBranches";
+import useBookings from "../hooks/useBookings";
 
 import { createUser } from "@/modules/users/api/userApi";
 
@@ -57,44 +50,149 @@ const RENTAL_TYPE_OPTIONS = [
 
 
 /* =========================================================
-   FORMAT DATETIME FOR datetime-local
+   SYSTEM VEHICLE STATUS
+   ---------------------------------------------------------
+   These are the ONLY vehicle statuses in the system.
 ========================================================= */
 
-const formatDateTimeLocal = (value) => {
-    if (!value) {
-        return "";
-    }
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return "";
-    }
-
-    const year = date.getFullYear();
-
-    const month = String(
-        date.getMonth() + 1
-    ).padStart(2, "0");
-
-    const day = String(
-        date.getDate()
-    ).padStart(2, "0");
-
-    const hours = String(
-        date.getHours()
-    ).padStart(2, "0");
-
-    const minutes = String(
-        date.getMinutes()
-    ).padStart(2, "0");
-
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+const VEHICLE_STATUS = {
+    AVAILABLE: "available",
+    BOOKED: "booked",
+    ON_TRIP: "on_trip",
+    MAINTENANCE: "maintenance",
+    INACTIVE: "inactive",
 };
 
 
 /* =========================================================
-   GET ID SAFELY
+   VEHICLE STATUS LABELS
+========================================================= */
+
+const VEHICLE_STATUS_LABELS = {
+    available: "Available",
+    booked: "Booked",
+    on_trip: "On Trip",
+    maintenance: "Maintenance",
+    inactive: "Inactive",
+};
+
+
+/* =========================================================
+   VEHICLE SORT ORDER
+   ---------------------------------------------------------
+   Available vehicles always come first.
+
+   1. Available
+   2. Booked
+   3. On Trip
+   4. Maintenance
+   5. Inactive
+========================================================= */
+
+const VEHICLE_STATUS_SORT_ORDER = {
+    available: 1,
+    booked: 2,
+    on_trip: 3,
+    maintenance: 4,
+    inactive: 5,
+};
+
+
+/* =========================================================
+   ACTIVE BOOKING STATUSES
+========================================================= */
+
+const ACTIVE_BOOKING_STATUSES = [
+    "pending",
+    "booked",
+    "confirmed",
+    "approved",
+    "ongoing",
+    "in_progress",
+    "active",
+    "trip_created",
+    "reserved",
+];
+
+
+/* =========================================================
+   INACTIVE BOOKING STATUSES
+========================================================= */
+
+const INACTIVE_BOOKING_STATUSES = [
+    "cancelled",
+    "canceled",
+    "completed",
+    "complete",
+    "rejected",
+    "declined",
+    "expired",
+    "closed",
+];
+
+
+/* =========================================================
+   NORMALIZE STATUS
+========================================================= */
+
+const normalizeStatus = (value) => {
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+        return "";
+    }
+
+    if (typeof value === "object") {
+        value =
+            value.value ??
+            value.status ??
+            value.name ??
+            value.label ??
+            value.slug ??
+            value.code ??
+            "";
+    }
+
+    return String(value)
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, "_");
+};
+
+
+/* =========================================================
+   IS ACTIVE BOOKING
+========================================================= */
+
+const isActiveBooking = (booking) => {
+    const status = normalizeStatus(
+        booking?.status ??
+        booking?.booking_status ??
+        booking?.bookingStatus ??
+        ""
+    );
+
+    if (
+        INACTIVE_BOOKING_STATUSES.includes(status)
+    ) {
+        return false;
+    }
+
+    if (status) {
+        return ACTIVE_BOOKING_STATUSES.includes(status);
+    }
+
+    return Boolean(
+        booking?.pickup_at &&
+        booking?.expected_return_at
+    );
+};
+
+
+/* =========================================================
+   GET ID
 ========================================================= */
 
 const getId = (value) => {
@@ -163,6 +261,7 @@ const normalizeRentalType = (value) => {
             value.code ??
             value.key ??
             value.rental_type ??
+            value.rentalType ??
             "";
     }
 
@@ -217,6 +316,7 @@ const getCustomerIdFromBooking = (booking) => {
         booking?.customer_id ??
         booking?.customer?.id ??
         booking?.customer?.user_id ??
+        booking?.customer?.user?.id ??
         ""
     );
 };
@@ -230,6 +330,7 @@ const getVehicleIdFromBooking = (booking) => {
     return normalizeId(
         booking?.vehicle_id ??
         booking?.vehicle?.id ??
+        booking?.vehicle?.vehicle_id ??
         ""
     );
 };
@@ -237,16 +338,6 @@ const getVehicleIdFromBooking = (booking) => {
 
 /* =========================================================
    PICKUP BRANCH ID
-
-   Supports:
-
-   pickup_branch_id
-
-   pickup_branch.id
-
-   pickup_branch.branch_id
-
-   pickup_branch_id returned as object
 ========================================================= */
 
 const getPickupBranchIdFromBooking = (booking) => {
@@ -254,6 +345,7 @@ const getPickupBranchIdFromBooking = (booking) => {
         booking?.pickup_branch_id ??
         booking?.pickup_branch?.id ??
         booking?.pickup_branch?.branch_id ??
+        booking?.pickupBranch?.id ??
         ""
     );
 };
@@ -268,8 +360,36 @@ const getDropBranchIdFromBooking = (booking) => {
         booking?.drop_branch_id ??
         booking?.drop_branch?.id ??
         booking?.drop_branch?.branch_id ??
+        booking?.dropBranch?.id ??
         ""
     );
+};
+
+
+/* =========================================================
+   DEFAULT FORM VALUES
+========================================================= */
+
+const EMPTY_FORM_VALUES = {
+    customer_id: "",
+    vehicle_id: "",
+    rental_type: "",
+
+    pickup_branch_id: "",
+    drop_branch_id: "",
+
+    pickup_location: "",
+    drop_location: "",
+
+    pickup_at: "",
+    expected_return_at: "",
+
+    quoted_amount: "",
+    discount_amount: "0",
+    final_amount: "",
+
+    customer_notes: "",
+    admin_notes: "",
 };
 
 
@@ -283,7 +403,6 @@ const BookingForm = ({
     isLoading = false,
     defaultValues = null,
 }) => {
-
     const queryClient = useQueryClient();
 
 
@@ -291,26 +410,97 @@ const BookingForm = ({
        API DATA
     ===================================================== */
 
-    const { data: users } = useUsers();
-    const { data: vehicles } = useVehicles();
-    const { data: branches } = useBranches();
+    const {
+        data: users,
+    } = useUsers();
 
+    const {
+        data: vehicles,
+    } = useVehicles();
 
-    const customers = Array.isArray(users)
-        ? users
-        : [];
+    const {
+        data: branches,
+    } = useBranches();
 
-    const vehicleList = Array.isArray(vehicles)
-        ? vehicles
-        : [];
-
-    const branchList = Array.isArray(branches)
-        ? branches
-        : [];
+    const {
+        data: bookings,
+    } = useBookings();
 
 
     /* =====================================================
-       CUSTOMER SEARCH
+       NORMALIZE API LISTS
+    ===================================================== */
+
+    const customers = useMemo(() => {
+        if (Array.isArray(users)) {
+            return users;
+        }
+
+        if (Array.isArray(users?.data)) {
+            return users.data;
+        }
+
+        if (Array.isArray(users?.data?.data)) {
+            return users.data.data;
+        }
+
+        return [];
+    }, [users]);
+
+
+    const vehicleList = useMemo(() => {
+        if (Array.isArray(vehicles)) {
+            return vehicles;
+        }
+
+        if (Array.isArray(vehicles?.data)) {
+            return vehicles.data;
+        }
+
+        if (Array.isArray(vehicles?.data?.data)) {
+            return vehicles.data.data;
+        }
+
+        return [];
+    }, [vehicles]);
+
+
+    const branchList = useMemo(() => {
+        if (Array.isArray(branches)) {
+            return branches;
+        }
+
+        if (Array.isArray(branches?.data)) {
+            return branches.data;
+        }
+
+        if (Array.isArray(branches?.data?.data)) {
+            return branches.data.data;
+        }
+
+        return [];
+    }, [branches]);
+
+
+    const bookingList = useMemo(() => {
+        if (Array.isArray(bookings)) {
+            return bookings;
+        }
+
+        if (Array.isArray(bookings?.data)) {
+            return bookings.data;
+        }
+
+        if (Array.isArray(bookings?.data?.data)) {
+            return bookings.data.data;
+        }
+
+        return [];
+    }, [bookings]);
+
+
+    /* =====================================================
+       SEARCH STATES
     ===================================================== */
 
     const [
@@ -322,6 +512,16 @@ const BookingForm = ({
         creatingCustomer,
         setCreatingCustomer,
     ] = useState(false);
+
+    const [
+        rentalTypeSearch,
+        setRentalTypeSearch,
+    ] = useState("");
+
+    const [
+        vehicleSearch,
+        setVehicleSearch,
+    ] = useState("");
 
 
     /* =====================================================
@@ -339,39 +539,19 @@ const BookingForm = ({
             errors,
             isSubmitting,
         },
-    } = useForm({
 
+    } = useForm({
         resolver: zodResolver(
             bookingSchema
         ),
 
-        defaultValues: {
-
-            customer_id: "",
-            vehicle_id: "",
-            rental_type: "",
-
-            pickup_branch_id: "",
-            drop_branch_id: "",
-
-            pickup_location: "",
-            drop_location: "",
-
-            pickup_at: "",
-            expected_return_at: "",
-
-            quoted_amount: "",
-            discount_amount: "0",
-            final_amount: "",
-
-            customer_notes: "",
-            admin_notes: "",
-        },
+        defaultValues:
+            EMPTY_FORM_VALUES,
     });
 
 
     /* =====================================================
-       WATCH VALUES
+       WATCH
     ===================================================== */
 
     const customerId = watch(
@@ -404,29 +584,416 @@ const BookingForm = ({
 
 
     /* =====================================================
+       EDIT MODE
+    ===================================================== */
+
+    const isEditMode = Boolean(
+        defaultValues
+    );
+
+    const currentBookingId = normalizeId(
+        defaultValues?.id ??
+        defaultValues?.booking_id
+    );
+
+    const currentBookingVehicleId =
+        getVehicleIdFromBooking(
+            defaultValues
+        );
+
+
+    /* =====================================================
+       VEHICLE AVAILABILITY
+       -----------------------------------------------------
+       ONLY THESE SYSTEM STATUSES ARE USED:
+
+       available
+       booked
+       on_trip
+       maintenance
+       inactive
+
+       AVAILABLE:
+       selectable
+
+       BOOKED:
+       disabled
+
+       ON TRIP:
+       disabled
+
+       MAINTENANCE:
+       disabled
+
+       INACTIVE:
+       disabled
+
+       EDIT MODE:
+       Current booking vehicle remains selectable.
+    ===================================================== */
+
+    const vehicleAvailability = useMemo(() => {
+        const result = {};
+
+        vehicleList.forEach((vehicle) => {
+            const id = normalizeId(
+                vehicle?.id
+            );
+
+            if (!id) {
+                return;
+            }
+
+            const vehicleStatus =
+                normalizeStatus(
+                    vehicle?.status
+                );
+
+            const isCurrentBookingVehicle =
+                Boolean(
+                    currentBookingId &&
+                    currentBookingVehicleId &&
+                    id === currentBookingVehicleId
+                );
+
+
+            /* =============================================
+               AVAILABLE
+            ============================================= */
+
+            if (
+                vehicleStatus ===
+                VEHICLE_STATUS.AVAILABLE
+            ) {
+                result[id] = {
+                    available: true,
+                    unavailable: false,
+                    status: vehicleStatus,
+                    reason: null,
+                    currentBookingVehicle:
+                        isCurrentBookingVehicle,
+                };
+
+                return;
+            }
+
+
+            /* =============================================
+               BOOKED / ON TRIP
+            ============================================= */
+
+            if (
+                vehicleStatus ===
+                    VEHICLE_STATUS.BOOKED ||
+                vehicleStatus ===
+                    VEHICLE_STATUS.ON_TRIP
+            ) {
+
+                /*
+                 * During edit, allow the vehicle
+                 * already assigned to this booking.
+                 */
+
+                if (
+                    isCurrentBookingVehicle
+                ) {
+                    result[id] = {
+                        available: true,
+                        unavailable: false,
+                        status: vehicleStatus,
+                        reason: null,
+                        currentBookingVehicle:
+                            true,
+                    };
+
+                    return;
+                }
+
+
+                result[id] = {
+                    available: false,
+                    unavailable: true,
+                    status: vehicleStatus,
+
+                    reason:
+                        vehicleStatus ===
+                        VEHICLE_STATUS.ON_TRIP
+                            ? "Vehicle currently on trip"
+                            : "Vehicle currently booked",
+
+                    currentBookingVehicle:
+                        false,
+                };
+
+                return;
+            }
+
+
+            /* =============================================
+               MAINTENANCE
+            ============================================= */
+
+            if (
+                vehicleStatus ===
+                VEHICLE_STATUS.MAINTENANCE
+            ) {
+                result[id] = {
+                    available: false,
+                    unavailable: true,
+                    status: vehicleStatus,
+                    reason:
+                        "Vehicle under maintenance",
+                    currentBookingVehicle:
+                        isCurrentBookingVehicle,
+                };
+
+                return;
+            }
+
+
+            /* =============================================
+               INACTIVE
+            ============================================= */
+
+            if (
+                vehicleStatus ===
+                VEHICLE_STATUS.INACTIVE
+            ) {
+                result[id] = {
+                    available: false,
+                    unavailable: true,
+                    status: vehicleStatus,
+                    reason:
+                        "Vehicle is inactive",
+                    currentBookingVehicle:
+                        isCurrentBookingVehicle,
+                };
+
+                return;
+            }
+
+
+            /* =============================================
+               UNKNOWN STATUS
+            ============================================= */
+
+            result[id] = {
+                available: false,
+                unavailable: true,
+                status: vehicleStatus,
+                reason:
+                    "Unknown vehicle status",
+                currentBookingVehicle:
+                    isCurrentBookingVehicle,
+            };
+        });
+
+        return result;
+    }, [
+        vehicleList,
+        currentBookingId,
+        currentBookingVehicleId,
+    ]);
+
+
+    /* =====================================================
+       SORT VEHICLES
+       -----------------------------------------------------
+       IMPORTANT:
+       Available vehicles ALWAYS come first.
+
+       Example:
+
+       Toyota Fortuner       Available
+       Hyundai Ionic         Available
+       Toyota Corolla        Available
+
+       ------------------------------
+
+       Toyota Hilux          Booked
+       Kia Sportage          On Trip
+       Hyundai Creta         Maintenance
+       Toyota Prius          Inactive
+    ===================================================== */
+
+    const sortedVehicleList = useMemo(() => {
+        const vehiclesWithIndex =
+            vehicleList.map(
+                (vehicle, index) => ({
+                    vehicle,
+                    index,
+                })
+            );
+
+        return vehiclesWithIndex
+            .sort((a, b) => {
+                const statusA =
+                    normalizeStatus(
+                        a.vehicle?.status
+                    );
+
+                const statusB =
+                    normalizeStatus(
+                        b.vehicle?.status
+                    );
+
+                const orderA =
+                    VEHICLE_STATUS_SORT_ORDER[
+                        statusA
+                    ] ?? 999;
+
+                const orderB =
+                    VEHICLE_STATUS_SORT_ORDER[
+                        statusB
+                    ] ?? 999;
+
+                /*
+                 * First sort by status.
+                 */
+
+                if (
+                    orderA !== orderB
+                ) {
+                    return (
+                        orderA -
+                        orderB
+                    );
+                }
+
+                /*
+                 * Then sort by vehicle name.
+                 */
+
+                const nameA =
+                    String(
+                        a.vehicle?.name ??
+                        ""
+                    ).toLowerCase();
+
+                const nameB =
+                    String(
+                        b.vehicle?.name ??
+                        ""
+                    ).toLowerCase();
+
+                if (
+                    nameA <
+                    nameB
+                ) {
+                    return -1;
+                }
+
+                if (
+                    nameA >
+                    nameB
+                ) {
+                    return 1;
+                }
+
+                /*
+                 * Preserve original order
+                 * when names are identical.
+                 */
+
+                return (
+                    a.index -
+                    b.index
+                );
+            })
+            .map(
+                (item) =>
+                    item.vehicle
+            );
+    }, [
+        vehicleList,
+    ]);
+
+
+    /* =====================================================
+       IS VEHICLE AVAILABLE
+    ===================================================== */
+
+    const isVehicleAvailable = (
+        vehicle
+    ) => {
+        const id = normalizeId(
+            vehicle?.id
+        );
+
+        if (!id) {
+            return false;
+        }
+
+        return (
+            vehicleAvailability[id]
+                ?.available === true
+        );
+    };
+
+
+    /* =====================================================
+       VEHICLE STATUS LABEL
+    ===================================================== */
+
+    const getVehicleStatusLabel = (
+        vehicle
+    ) => {
+        const id = normalizeId(
+            vehicle?.id
+        );
+
+        const status =
+            normalizeStatus(
+                vehicle?.status
+            );
+
+
+        /*
+         * Current booking vehicle should
+         * not show Booked / On Trip while
+         * editing.
+         */
+
+        if (
+            currentBookingVehicleId &&
+            id === currentBookingVehicleId &&
+            currentBookingId
+        ) {
+            return "";
+        }
+
+
+        return (
+            VEHICLE_STATUS_LABELS[
+                status
+            ] ?? "Unavailable"
+        );
+    };
+
+
+    /* =====================================================
        POPULATE EDIT DATA
     ===================================================== */
 
     useEffect(() => {
-
         if (!defaultValues) {
+            reset(
+                EMPTY_FORM_VALUES
+            );
+
             return;
         }
 
 
         console.log(
-            "========== BOOKING EDIT DATA =========="
+            "========== EDIT BOOKING =========="
         );
 
         console.log(
-            "API BOOKING:",
+            "RAW BOOKING:",
             defaultValues
         );
 
-
-        /* =================================================
-           CUSTOMER
-        ================================================= */
 
         const customerId =
             getCustomerIdFromBooking(
@@ -434,33 +1001,21 @@ const BookingForm = ({
             );
 
 
-        /* =================================================
-           VEHICLE
-        ================================================= */
-
         const vehicleId =
             getVehicleIdFromBooking(
                 defaultValues
             );
 
 
-        /* =================================================
-           RENTAL TYPE
-        ================================================= */
-
         const rentalType =
             normalizeRentalType(
-                defaultValues.rental_type ??
-                defaultValues.rentalType ??
-                defaultValues.booking_type ??
-                defaultValues.bookingType ??
-                defaultValues.type
+                defaultValues?.rental_type ??
+                defaultValues?.rentalType ??
+                defaultValues?.booking_type ??
+                defaultValues?.bookingType ??
+                defaultValues?.type
             );
 
-
-        /* =================================================
-           PICKUP BRANCH
-        ================================================= */
 
         const pickupBranchId =
             getPickupBranchIdFromBooking(
@@ -468,42 +1023,24 @@ const BookingForm = ({
             );
 
 
-        /* =================================================
-           DROP BRANCH
-        ================================================= */
-
         const dropBranchId =
             getDropBranchIdFromBooking(
                 defaultValues
             );
 
 
-        /* =================================================
-           LOCATIONS
-        ================================================= */
-
-        const pickupLocation =
-            defaultValues.pickup_location ??
+        const pickupDate =
+            defaultValues?.pickup_at ??
+            defaultValues?.pickupAt ??
             "";
 
-        const dropLocation =
-            defaultValues.drop_location ??
+        const returnDate =
+            defaultValues?.expected_return_at ??
+            defaultValues?.expectedReturnAt ??
             "";
 
-
-        /* =================================================
-           BUILD FORM VALUES
-
-           IMPORTANT:
-
-           Do NOT remove branch IDs based on rental type
-           while reading API data.
-
-           Let the API determine what exists.
-        ================================================= */
 
         const values = {
-
             customer_id:
                 customerId,
 
@@ -520,25 +1057,43 @@ const BookingForm = ({
                 dropBranchId,
 
             pickup_location:
-                pickupLocation,
+                defaultValues?.pickup_location ??
+                defaultValues?.pickupLocation ??
+                "",
 
             drop_location:
-                dropLocation,
+                defaultValues?.drop_location ??
+                defaultValues?.dropLocation ??
+                "",
 
             pickup_at:
-                formatDateTimeLocal(
-                    defaultValues.pickup_at
-                ),
+                pickupDate
+                    ? new Date(
+                        pickupDate
+                    )
+                        .toISOString()
+                        .slice(
+                            0,
+                            16
+                        )
+                    : "",
 
             expected_return_at:
-                formatDateTimeLocal(
-                    defaultValues.expected_return_at
-                ),
+                returnDate
+                    ? new Date(
+                        returnDate
+                    )
+                        .toISOString()
+                        .slice(
+                            0,
+                            16
+                        )
+                    : "",
 
             quoted_amount:
-                defaultValues.quoted_amount !==
+                defaultValues?.quoted_amount !==
                     null &&
-                defaultValues.quoted_amount !==
+                defaultValues?.quoted_amount !==
                     undefined
                     ? String(
                         defaultValues.quoted_amount
@@ -546,9 +1101,9 @@ const BookingForm = ({
                     : "",
 
             discount_amount:
-                defaultValues.discount_amount !==
+                defaultValues?.discount_amount !==
                     null &&
-                defaultValues.discount_amount !==
+                defaultValues?.discount_amount !==
                     undefined
                     ? String(
                         defaultValues.discount_amount
@@ -556,9 +1111,9 @@ const BookingForm = ({
                     : "0",
 
             final_amount:
-                defaultValues.final_amount !==
+                defaultValues?.final_amount !==
                     null &&
-                defaultValues.final_amount !==
+                defaultValues?.final_amount !==
                     undefined
                     ? String(
                         defaultValues.final_amount
@@ -566,34 +1121,35 @@ const BookingForm = ({
                     : "",
 
             customer_notes:
-                defaultValues.customer_notes ??
+                defaultValues?.customer_notes ??
+                defaultValues?.customerNotes ??
                 "",
 
             admin_notes:
-                defaultValues.admin_notes ??
+                defaultValues?.admin_notes ??
+                defaultValues?.adminNotes ??
                 "",
         };
 
 
         console.log(
-            "NORMALIZED FORM VALUES:",
+            "NORMALIZED EDIT VALUES:",
             values
         );
 
 
-        /* =================================================
-           RESET FORM
-        ================================================= */
+        reset(
+            values,
+            {
+                keepDefaultValues:
+                    false,
+            }
+        );
 
-        reset(values);
-
-
-        /* =================================================
-           CUSTOMER SEARCH RESET
-        ================================================= */
 
         setCustomerSearch("");
-
+        setRentalTypeSearch("");
+        setVehicleSearch("");
 
     }, [
         defaultValues,
@@ -606,12 +1162,15 @@ const BookingForm = ({
     ===================================================== */
 
     useEffect(() => {
-
         const quoted =
-            Number(quotedAmount) || 0;
+            Number(
+                quotedAmount
+            ) || 0;
 
         const discount =
-            Number(discountAmount) || 0;
+            Number(
+                discountAmount
+            ) || 0;
 
         const finalAmount =
             Math.max(
@@ -623,10 +1182,10 @@ const BookingForm = ({
             "final_amount",
             finalAmount.toFixed(2),
             {
-                shouldValidate: true,
+                shouldValidate:
+                    true,
             }
         );
-
     }, [
         quotedAmount,
         discountAmount,
@@ -641,7 +1200,6 @@ const BookingForm = ({
     const handleRentalTypeChange = (
         value
     ) => {
-
         setValue(
             "rental_type",
             value,
@@ -652,41 +1210,21 @@ const BookingForm = ({
         );
 
 
-        if (
-            value === "self_drive"
-        ) {
-
-            setValue(
-                "pickup_location",
-                "",
-                {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                }
-            );
-
-            setValue(
-                "drop_location",
-                "",
-                {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                }
-            );
-
-        }
+        setRentalTypeSearch("");
 
 
         if (
-            value === "with_driver"
+            value ===
+            "with_driver"
         ) {
-
             setValue(
                 "pickup_branch_id",
                 "",
                 {
-                    shouldValidate: true,
-                    shouldDirty: true,
+                    shouldValidate:
+                        true,
+                    shouldDirty:
+                        true,
                 }
             );
 
@@ -694,11 +1232,40 @@ const BookingForm = ({
                 "drop_branch_id",
                 "",
                 {
-                    shouldValidate: true,
-                    shouldDirty: true,
+                    shouldValidate:
+                        true,
+                    shouldDirty:
+                        true,
+                }
+            );
+        }
+
+
+        if (
+            value ===
+            "self_drive"
+        ) {
+            setValue(
+                "pickup_location",
+                "",
+                {
+                    shouldValidate:
+                        true,
+                    shouldDirty:
+                        true,
                 }
             );
 
+            setValue(
+                "drop_location",
+                "",
+                {
+                    shouldValidate:
+                        true,
+                    shouldDirty:
+                        true,
+                }
+            );
         }
     };
 
@@ -713,12 +1280,13 @@ const BookingForm = ({
             const name =
                 customerSearch.trim();
 
+
             if (!name) {
                 return;
             }
 
-            try {
 
+            try {
                 setCreatingCustomer(
                     true
                 );
@@ -743,7 +1311,6 @@ const BookingForm = ({
 
                 const response =
                     await createUser({
-
                         name,
 
                         email:
@@ -760,7 +1327,8 @@ const BookingForm = ({
                         password_confirmation:
                             password,
 
-                        status: "active",
+                        status:
+                            "active",
                     });
 
 
@@ -776,14 +1344,9 @@ const BookingForm = ({
                     response;
 
 
-                console.log(
-                    "NEW CUSTOMER:",
-                    newCustomer
-                );
-
-
-                if (!newCustomer?.id) {
-
+                if (
+                    !newCustomer?.id
+                ) {
                     console.error(
                         "Customer created but ID was not returned.",
                         response
@@ -794,7 +1357,9 @@ const BookingForm = ({
 
 
                 await queryClient.refetchQueries({
-                    queryKey: ["users"],
+                    queryKey: [
+                        "users",
+                    ],
                 });
 
 
@@ -804,17 +1369,18 @@ const BookingForm = ({
                         newCustomer.id
                     ),
                     {
-                        shouldValidate: true,
-                        shouldDirty: true,
+                        shouldValidate:
+                            true,
+
+                        shouldDirty:
+                            true,
                     }
                 );
 
 
                 setCustomerSearch("");
 
-
             } catch (error) {
-
                 console.error(
                     "CUSTOMER CREATE ERROR:",
                     error
@@ -831,7 +1397,6 @@ const BookingForm = ({
                 );
 
             } finally {
-
                 setCreatingCustomer(
                     false
                 );
@@ -852,8 +1417,75 @@ const BookingForm = ({
             "self_drive";
 
 
-        const payload = {
+        const selectedVehicle =
+            vehicleList.find(
+                (vehicle) =>
+                    normalizeId(
+                        vehicle?.id
+                    ) ===
+                    normalizeId(
+                        data.vehicle_id
+                    )
+            );
 
+
+        /* =================================================
+           VEHICLE CHECK
+        ================================================= */
+
+        if (
+            selectedVehicle
+        ) {
+            const selectedVehicleId =
+                normalizeId(
+                    selectedVehicle.id
+                );
+
+            const availability =
+                vehicleAvailability[
+                    selectedVehicleId
+                ];
+
+
+            const isCurrentVehicle =
+                Boolean(
+                    currentBookingId &&
+                    currentBookingVehicleId &&
+                    selectedVehicleId ===
+                        currentBookingVehicleId
+                );
+
+
+            if (
+                !isCurrentVehicle &&
+                !availability?.available
+            ) {
+                console.error(
+                    "Selected vehicle is unavailable:",
+                    {
+                        vehicleId:
+                            selectedVehicleId,
+
+                        vehicle:
+                            selectedVehicle?.name,
+
+                        status:
+                            selectedVehicle?.status,
+
+                        availability,
+                    }
+                );
+
+                return;
+            }
+        }
+
+
+        /* =================================================
+           PAYLOAD
+        ================================================= */
+
+        const payload = {
             ...data,
 
             customer_id:
@@ -870,7 +1502,6 @@ const BookingForm = ({
                     )
                     : null,
 
-
             pickup_branch_id:
                 isSelfDrive &&
                 data.pickup_branch_id
@@ -878,7 +1509,6 @@ const BookingForm = ({
                         data.pickup_branch_id
                     )
                     : null,
-
 
             drop_branch_id:
                 isSelfDrive &&
@@ -888,7 +1518,6 @@ const BookingForm = ({
                     )
                     : null,
 
-
             pickup_location:
                 isSelfDrive
                     ? null
@@ -896,19 +1525,71 @@ const BookingForm = ({
                         ?.trim() ||
                     null,
 
-
             drop_location:
                 isSelfDrive
                     ? null
                     : data.drop_location
                         ?.trim() ||
                     null,
+
+            quoted_amount:
+                data.quoted_amount !==
+                ""
+                    ? Number(
+                        data.quoted_amount
+                    )
+                    : 0,
+
+            discount_amount:
+                data.discount_amount !==
+                ""
+                    ? Number(
+                        data.discount_amount
+                    )
+                    : 0,
+
+            final_amount:
+                data.final_amount !==
+                ""
+                    ? Number(
+                        data.final_amount
+                    )
+                    : 0,
         };
 
 
+        /* =================================================
+           EDIT ID
+        ================================================= */
+
+        if (
+            currentBookingId
+        ) {
+            payload.id =
+                Number(
+                    currentBookingId
+                );
+        }
+
+
         console.log(
-            "FINAL BOOKING PAYLOAD:",
+            "===================================="
+        );
+
+        console.log(
+            isEditMode
+                ? "UPDATE BOOKING PAYLOAD:"
+                : "CREATE BOOKING PAYLOAD:",
             payload
+        );
+
+        console.log(
+            "BOOKING ID:",
+            currentBookingId
+        );
+
+        console.log(
+            "===================================="
         );
 
 
@@ -919,11 +1600,84 @@ const BookingForm = ({
 
 
     /* =====================================================
+       SELECTED RENTAL TYPE
+    ===================================================== */
+
+    const selectedRentalType =
+        RENTAL_TYPE_OPTIONS.find(
+            (option) =>
+                option.value ===
+                rentalType
+        );
+
+
+    /* =====================================================
+       FILTER CUSTOMERS
+    ===================================================== */
+
+    const filteredCustomers =
+        useMemo(() => {
+            const search =
+                customerSearch
+                    .trim()
+                    .toLowerCase();
+
+            if (!search) {
+                return customers;
+            }
+
+            return customers.filter(
+                (customer) =>
+                    `${customer?.name || ""} ${customer?.email || ""} ${customer?.phone || ""}`
+                        .toLowerCase()
+                        .includes(search)
+            );
+        }, [
+            customers,
+            customerSearch,
+        ]);
+
+
+    /* =====================================================
+       FILTER VEHICLES
+       -----------------------------------------------------
+       IMPORTANT:
+
+       We filter from sortedVehicleList,
+       NOT vehicleList.
+
+       Therefore the status ordering remains
+       even when searching.
+    ===================================================== */
+
+    const filteredVehicles =
+        useMemo(() => {
+            const search =
+                vehicleSearch
+                    .trim()
+                    .toLowerCase();
+
+            if (!search) {
+                return sortedVehicleList;
+            }
+
+            return sortedVehicleList.filter(
+                (vehicle) =>
+                    `${vehicle?.name || ""} ${vehicle?.registration_number || ""} ${vehicle?.status || ""}`
+                        .toLowerCase()
+                        .includes(search)
+            );
+        }, [
+            sortedVehicleList,
+            vehicleSearch,
+        ]);
+
+
+    /* =====================================================
        RENDER
     ===================================================== */
 
     return (
-
         <form
             onSubmit={
                 handleSubmit(
@@ -939,6 +1693,7 @@ const BookingForm = ({
 
             className="
                 bg-white
+                border
                 border-gray-200
                 rounded-xl
                 shadow-sm
@@ -946,6 +1701,10 @@ const BookingForm = ({
                 space-y-6
             "
         >
+
+            {/* =================================================
+                FORM GRID
+            ================================================= */}
 
             <div
                 className="
@@ -955,7 +1714,6 @@ const BookingForm = ({
                     gap-5
                 "
             >
-
 
                 {/* =================================================
                     CUSTOMER
@@ -967,11 +1725,10 @@ const BookingForm = ({
                         Customer
                     </label>
 
+
                     <Popover>
 
-                        <PopoverTrigger
-                            asChild
-                        >
+                        <PopoverTrigger asChild>
 
                             <button
                                 type="button"
@@ -995,7 +1752,7 @@ const BookingForm = ({
                                             customers.find(
                                                 (customer) =>
                                                     normalizeId(
-                                                        customer.id
+                                                        customer?.id
                                                     ) ===
                                                     normalizeId(
                                                         customerId
@@ -1007,6 +1764,7 @@ const BookingForm = ({
                                         : "Select customer"}
 
                                 </span>
+
 
                                 <ChevronsUpDown
                                     className="
@@ -1047,19 +1805,11 @@ const BookingForm = ({
                                     }
                                 />
 
+
                                 <CommandList>
 
                                     {customerSearch.trim() &&
-                                        !customers.some(
-                                            (customer) =>
-                                                `${customer.name || ""} ${customer.email || ""}`
-                                                    .toLowerCase()
-                                                    .includes(
-                                                        customerSearch
-                                                            .trim()
-                                                            .toLowerCase()
-                                                    )
-                                        ) && (
+                                        filteredCustomers.length === 0 && (
 
                                             <div
                                                 className="
@@ -1078,6 +1828,7 @@ const BookingForm = ({
                                                 >
                                                     No customer found.
                                                 </div>
+
 
                                                 <button
                                                     type="button"
@@ -1111,33 +1862,36 @@ const BookingForm = ({
                                                     </span>
 
                                                     <span>
-
                                                         {creatingCustomer
                                                             ? "Creating customer..."
                                                             : `Create "${customerSearch.trim()}" as new customer`}
-
                                                     </span>
 
                                                 </button>
 
                                             </div>
-
                                         )}
+
+
+                                    <CommandEmpty>
+                                        No customer found.
+                                    </CommandEmpty>
 
 
                                     <CommandGroup>
 
-                                        {customers.map(
+                                        {filteredCustomers.map(
                                             (customer) => (
 
                                                 <CommandItem
                                                     key={
-                                                        customer.id
+                                                        customer?.id
                                                     }
 
                                                     value={`
-                                                        ${customer.name}
-                                                        ${customer.email || ""}
+                                                        ${customer?.name || ""}
+                                                        ${customer?.email || ""}
+                                                        ${customer?.phone || ""}
                                                     `}
 
                                                     onSelect={() => {
@@ -1150,13 +1904,13 @@ const BookingForm = ({
                                                             {
                                                                 shouldValidate:
                                                                     true,
+
                                                                 shouldDirty:
                                                                     true,
                                                             }
                                                         );
 
                                                         setCustomerSearch("");
-
                                                     }}
                                                 >
 
@@ -1165,13 +1919,12 @@ const BookingForm = ({
                                                             mr-2
                                                             h-4
                                                             w-4
-
                                                             ${
                                                                 normalizeId(
                                                                     customerId
                                                                 ) ===
                                                                 normalizeId(
-                                                                    customer.id
+                                                                    customer?.id
                                                                 )
                                                                     ? "opacity-100"
                                                                     : "opacity-0"
@@ -1179,15 +1932,15 @@ const BookingForm = ({
                                                         `}
                                                     />
 
+
                                                     <span className="truncate">
 
                                                         {
-                                                            customer.name
+                                                            customer?.name
                                                         }
 
-                                                        {customer.email
-                                                            ? ` — ${customer.email}`
-                                                            : ""}
+                                                        {customer?.email &&
+                                                            ` — ${customer.email}`}
 
                                                     </span>
 
@@ -1205,6 +1958,7 @@ const BookingForm = ({
                         </PopoverContent>
 
                     </Popover>
+
 
                     <p className="error-text">
                         {
@@ -1225,11 +1979,10 @@ const BookingForm = ({
                         Vehicle
                     </label>
 
+
                     <Popover>
 
-                        <PopoverTrigger
-                            asChild
-                        >
+                        <PopoverTrigger asChild>
 
                             <button
                                 type="button"
@@ -1253,7 +2006,7 @@ const BookingForm = ({
                                             vehicleList.find(
                                                 (vehicle) =>
                                                     normalizeId(
-                                                        vehicle.id
+                                                        vehicle?.id
                                                     ) ===
                                                     normalizeId(
                                                         vehicleId
@@ -1265,6 +2018,7 @@ const BookingForm = ({
                                         : "Select vehicle"}
 
                                 </span>
+
 
                                 <ChevronsUpDown
                                     className="
@@ -1295,7 +2049,16 @@ const BookingForm = ({
 
                                 <CommandInput
                                     placeholder="Search vehicle..."
+
+                                    value={
+                                        vehicleSearch
+                                    }
+
+                                    onValueChange={
+                                        setVehicleSearch
+                                    }
                                 />
+
 
                                 <CommandList>
 
@@ -1303,34 +2066,443 @@ const BookingForm = ({
                                         No vehicle found.
                                     </CommandEmpty>
 
+
+                                    {/* =================================================
+                                        AVAILABLE VEHICLES
+                                    ================================================= */}
+
+                                    <CommandGroup heading="Available Vehicles">
+
+                                        {filteredVehicles
+                                            .filter(
+                                                (vehicle) =>
+                                                    normalizeStatus(
+                                                        vehicle?.status
+                                                    ) ===
+                                                    VEHICLE_STATUS.AVAILABLE
+                                            )
+                                            .map(
+                                                (vehicle) => {
+
+                                                    const currentVehicleId =
+                                                        normalizeId(
+                                                            vehicle?.id
+                                                        );
+
+                                                    const available =
+                                                        isVehicleAvailable(
+                                                            vehicle
+                                                        );
+
+                                                    const isCurrentVehicle =
+                                                        Boolean(
+                                                            currentBookingId &&
+                                                            currentBookingVehicleId &&
+                                                            currentVehicleId ===
+                                                                currentBookingVehicleId
+                                                        );
+
+                                                    const selectable =
+                                                        available ||
+                                                        isCurrentVehicle;
+
+                                                    return (
+
+                                                        <CommandItem
+                                                            key={
+                                                                currentVehicleId
+                                                            }
+
+                                                            value={`
+                                                                ${vehicle?.name || ""}
+                                                                ${vehicle?.registration_number || ""}
+                                                                Available
+                                                            `}
+
+                                                            disabled={
+                                                                !selectable
+                                                            }
+
+                                                            onSelect={() => {
+
+                                                                if (
+                                                                    !selectable
+                                                                ) {
+                                                                    return;
+                                                                }
+
+                                                                setValue(
+                                                                    "vehicle_id",
+                                                                    currentVehicleId,
+                                                                    {
+                                                                        shouldValidate:
+                                                                            true,
+
+                                                                        shouldDirty:
+                                                                            true,
+                                                                    }
+                                                                );
+                                                            }}
+
+                                                            className={`
+                                                                ${
+                                                                    !selectable
+                                                                        ? "opacity-50 cursor-not-allowed"
+                                                                        : "cursor-pointer"
+                                                                }
+                                                            `}
+                                                        >
+
+                                                            <Check
+                                                                className={`
+                                                                    mr-2
+                                                                    h-4
+                                                                    w-4
+                                                                    ${
+                                                                        normalizeId(
+                                                                            vehicleId
+                                                                        ) ===
+                                                                        currentVehicleId
+                                                                            ? "opacity-100"
+                                                                            : "opacity-0"
+                                                                    }
+                                                                `}
+                                                            />
+
+
+                                                            <span
+                                                                className="
+                                                                    truncate
+                                                                    flex-1
+                                                                "
+                                                            >
+
+                                                                {
+                                                                    vehicle?.name
+                                                                }
+
+
+                                                                {vehicle?.registration_number && (
+
+                                                                    <span
+                                                                        className="
+                                                                            ml-2
+                                                                            shrink-0
+                                                                            text-[11px]
+                                                                            text-gray-500
+                                                                        "
+                                                                    >
+                                                                        —
+                                                                        {
+                                                                            vehicle.registration_number
+                                                                        }
+                                                                    </span>
+
+                                                                )}
+
+                                                            </span>
+
+                                                        </CommandItem>
+
+                                                    );
+                                                }
+                                            )}
+
+                                    </CommandGroup>
+
+
+                                    {/* =================================================
+                                        OTHER VEHICLES
+                                    ================================================= */}
+
+                                    <CommandGroup heading="Other Vehicles">
+
+                                        {filteredVehicles
+                                            .filter(
+                                                (vehicle) =>
+                                                    normalizeStatus(
+                                                        vehicle?.status
+                                                    ) !==
+                                                    VEHICLE_STATUS.AVAILABLE
+                                            )
+                                            .map(
+                                                (vehicle) => {
+
+                                                    const currentVehicleId =
+                                                        normalizeId(
+                                                            vehicle?.id
+                                                        );
+
+                                                    const available =
+                                                        isVehicleAvailable(
+                                                            vehicle
+                                                        );
+
+                                                    const statusLabel =
+                                                        getVehicleStatusLabel(
+                                                            vehicle
+                                                        );
+
+                                                    const isCurrentVehicle =
+                                                        Boolean(
+                                                            currentBookingId &&
+                                                            currentBookingVehicleId &&
+                                                            currentVehicleId ===
+                                                                currentBookingVehicleId
+                                                        );
+
+                                                    const selectable =
+                                                        available ||
+                                                        isCurrentVehicle;
+
+                                                    return (
+
+                                                        <CommandItem
+                                                            key={
+                                                                currentVehicleId
+                                                            }
+
+                                                            value={`
+                                                                ${vehicle?.name || ""}
+                                                                ${vehicle?.registration_number || ""}
+                                                                ${statusLabel}
+                                                            `}
+
+                                                            disabled={
+                                                                !selectable
+                                                            }
+
+                                                            onSelect={() => {
+
+                                                                if (
+                                                                    !selectable
+                                                                ) {
+                                                                    return;
+                                                                }
+
+                                                                setValue(
+                                                                    "vehicle_id",
+                                                                    currentVehicleId,
+                                                                    {
+                                                                        shouldValidate:
+                                                                            true,
+
+                                                                        shouldDirty:
+                                                                            true,
+                                                                    }
+                                                                );
+                                                            }}
+
+                                                            className={`
+                                                                ${
+                                                                    !selectable
+                                                                        ? "opacity-50 cursor-not-allowed"
+                                                                        : "cursor-pointer"
+                                                                }
+                                                            `}
+                                                        >
+
+                                                            <Check
+                                                                className={`
+                                                                    mr-2
+                                                                    h-4
+                                                                    w-4
+                                                                    ${
+                                                                        normalizeId(
+                                                                            vehicleId
+                                                                        ) ===
+                                                                        currentVehicleId
+                                                                            ? "opacity-100"
+                                                                            : "opacity-0"
+                                                                    }
+                                                                `}
+                                                            />
+
+
+                                                            <span
+                                                                className="
+                                                                    truncate
+                                                                    flex-1
+                                                                "
+                                                            >
+
+                                                                {
+                                                                    vehicle?.name
+                                                                }
+
+
+                                                                {vehicle?.registration_number && (
+
+                                                                    <span
+                                                                        className="
+                                                                            ml-2
+                                                                            shrink-0
+                                                                            text-[11px]
+                                                                            text-gray-500
+                                                                        "
+                                                                    >
+                                                                        —
+                                                                        {
+                                                                            vehicle.registration_number
+                                                                        }
+                                                                    </span>
+
+                                                                )}
+
+                                                            </span>
+
+
+                                                            {statusLabel && (
+
+                                                                <span
+                                                                    className="
+                                                                        ml-2
+                                                                        shrink-0
+                                                                        text-[10px]
+                                                                        text-red-500
+                                                                    "
+                                                                >
+                                                                    (
+                                                                    {
+                                                                        statusLabel
+                                                                    }
+                                                                    )
+                                                                </span>
+
+                                                            )}
+
+                                                        </CommandItem>
+
+                                                    );
+                                                }
+                                            )}
+
+                                    </CommandGroup>
+
+                                </CommandList>
+
+                            </Command>
+
+                        </PopoverContent>
+
+                    </Popover>
+
+
+                    <p className="error-text">
+                        {
+                            errors.vehicle_id?.message
+                        }
+                    </p>
+
+                </div>
+
+
+                {/* =================================================
+                    RENTAL TYPE
+                ================================================= */}
+
+                <div className="w-full">
+
+                    <label className="form-label">
+                        Rental Type
+                    </label>
+
+
+                    <Popover>
+
+                        <PopoverTrigger asChild>
+
+                            <button
+                                type="button"
+                                role="combobox"
+
+                                className="
+                                    form-input
+                                    w-full
+                                    flex
+                                    items-center
+                                    justify-between
+                                    text-left
+                                    font-normal
+                                "
+                            >
+
+                                <span className="truncate">
+
+                                    {
+                                        selectedRentalType?.label ||
+                                        "Select rental type"
+                                    }
+
+                                </span>
+
+
+                                <ChevronsUpDown
+                                    className="
+                                        ml-2
+                                        h-4
+                                        w-4
+                                        shrink-0
+                                        opacity-50
+                                    "
+                                />
+
+                            </button>
+
+                        </PopoverTrigger>
+
+
+                        <PopoverContent
+                            align="start"
+
+                            className="
+                                w-[var(--radix-popover-trigger-width)]
+                                min-w-0
+                                p-0
+                            "
+                        >
+
+                            <Command>
+
+                                <CommandInput
+                                    placeholder="Search rental type..."
+
+                                    value={
+                                        rentalTypeSearch
+                                    }
+
+                                    onValueChange={
+                                        setRentalTypeSearch
+                                    }
+                                />
+
+
+                                <CommandList>
+
+                                    <CommandEmpty>
+                                        No rental type found.
+                                    </CommandEmpty>
+
+
                                     <CommandGroup>
 
-                                        {vehicleList.map(
-                                            (vehicle) => (
+                                        {RENTAL_TYPE_OPTIONS.map(
+                                            (option) => (
 
                                                 <CommandItem
                                                     key={
-                                                        vehicle.id
+                                                        option.value
                                                     }
 
                                                     value={`
-                                                        ${vehicle.name}
-                                                        ${vehicle.registration_number || ""}
+                                                        ${option.label}
+                                                        ${option.value}
                                                     `}
 
                                                     onSelect={() => {
 
-                                                        setValue(
-                                                            "vehicle_id",
-                                                            String(
-                                                                vehicle.id
-                                                            ),
-                                                            {
-                                                                shouldValidate:
-                                                                    true,
-                                                                shouldDirty:
-                                                                    true,
-                                                            }
+                                                        handleRentalTypeChange(
+                                                            option.value
                                                         );
 
                                                     }}
@@ -1338,34 +2510,24 @@ const BookingForm = ({
 
                                                     <Check
                                                         className={`
-
                                                             mr-2
                                                             h-4
                                                             w-4
-
                                                             ${
-                                                                normalizeId(
-                                                                    vehicleId
-                                                                ) ===
-                                                                normalizeId(
-                                                                    vehicle.id
-                                                                )
+                                                                rentalType ===
+                                                                option.value
                                                                     ? "opacity-100"
                                                                     : "opacity-0"
                                                             }
-
                                                         `}
                                                     />
+
 
                                                     <span className="truncate">
 
                                                         {
-                                                            vehicle.name
+                                                            option.label
                                                         }
-
-                                                        {vehicle.registration_number
-                                                            ? ` — ${vehicle.registration_number}`
-                                                            : ""}
 
                                                     </span>
 
@@ -1384,78 +2546,6 @@ const BookingForm = ({
 
                     </Popover>
 
-                    <p className="error-text">
-                        {
-                            errors.vehicle_id?.message
-                        }
-                    </p>
-
-                </div>
-
-
-                {/* =================================================
-                    RENTAL TYPE
-                ================================================= */}
-
-                <div>
-
-                    <label className="form-label">
-                        Rental Type
-                    </label>
-
-                    <Select
-
-                        key={`rental-type-${defaultValues?.id ?? "new"}-${rentalType}`}
-
-                        value={
-                            rentalType || ""
-                        }
-
-                        onValueChange={
-                            handleRentalTypeChange
-                        }
-                    >
-
-                        <SelectTrigger
-                            className="
-                                w-full
-                                h-11
-                                rounded-lg
-                                border-gray-300
-                            "
-                        >
-
-                            <SelectValue
-                                placeholder="Select rental type"
-                            />
-
-                        </SelectTrigger>
-
-                        <SelectContent>
-
-                            {RENTAL_TYPE_OPTIONS.map(
-                                (option) => (
-
-                                    <SelectItem
-                                        key={
-                                            option.value
-                                        }
-
-                                        value={
-                                            option.value
-                                        }
-                                    >
-                                        {
-                                            option.label
-                                        }
-                                    </SelectItem>
-
-                                )
-                            )}
-
-                        </SelectContent>
-
-                    </Select>
 
                     <p className="error-text">
                         {
@@ -1474,16 +2564,17 @@ const BookingForm = ({
 
                     <label className="form-label">
 
-                        {rentalType ===
-                        "with_driver"
-                            ? "Pickup Location"
-                            : "Pickup Branch"}
+                        {
+                            rentalType ===
+                            "with_driver"
+                                ? "Pickup Location"
+                                : "Pickup Branch"
+                        }
 
                     </label>
 
 
-                    {rentalType ===
-                    "with_driver" ? (
+                    {rentalType === "with_driver" ? (
 
                         <input
                             type="text"
@@ -1499,90 +2590,63 @@ const BookingForm = ({
 
                     ) : (
 
-                        <Select
+                        <select
+                            {...register(
+                                "pickup_branch_id"
+                            )}
 
-                            key={`pickup-branch-${defaultValues?.id ?? "new"}-${pickupBranchId}`}
-
-                            value={
-                                pickupBranchId || ""
-                            }
-
-                            onValueChange={
-                                (value) => {
-
-                                    setValue(
-                                        "pickup_branch_id",
-                                        value,
-                                        {
-                                            shouldValidate:
-                                                true,
-                                            shouldDirty:
-                                                true,
-                                        }
-                                    );
-
-                                }
-                            }
+                            className="
+                                form-input
+                                w-full
+                            "
                         >
 
-                            <SelectTrigger
-                                className="
-                                    w-full
-                                    h-11
-                                    rounded-lg
-                                    border-gray-300
-                                "
-                            >
+                            <option value="">
+                                Select pickup branch
+                            </option>
 
-                                <SelectValue
-                                    placeholder="Select pickup branch"
-                                />
 
-                            </SelectTrigger>
+                            {branchList.map(
+                                (branch) => {
 
-                            <SelectContent>
-
-                                {branchList.map(
-                                    (branch) => {
-
-                                        const branchId =
-                                            normalizeId(
-                                                branch.id
-                                            );
-
-                                        return (
-
-                                            <SelectItem
-                                                key={
-                                                    branchId
-                                                }
-
-                                                value={
-                                                    branchId
-                                                }
-                                            >
-                                                {
-                                                    branch.name
-                                                }
-                                            </SelectItem>
-
+                                    const branchId =
+                                        normalizeId(
+                                            branch?.id
                                         );
 
-                                    }
-                                )}
+                                    return (
 
-                            </SelectContent>
+                                        <option
+                                            key={
+                                                branchId
+                                            }
 
-                        </Select>
+                                            value={
+                                                branchId
+                                            }
+                                        >
+                                            {
+                                                branch?.name
+                                            }
+                                        </option>
+
+                                    );
+                                }
+                            )}
+
+                        </select>
 
                     )}
 
+
                     <p className="error-text">
 
-                        {rentalType ===
-                        "with_driver"
-                            ? errors.pickup_location?.message
-                            : errors.pickup_branch_id?.message}
+                        {
+                            rentalType ===
+                            "with_driver"
+                                ? errors.pickup_location?.message
+                                : errors.pickup_branch_id?.message
+                        }
 
                     </p>
 
@@ -1597,16 +2661,17 @@ const BookingForm = ({
 
                     <label className="form-label">
 
-                        {rentalType ===
-                        "with_driver"
-                            ? "Drop Location"
-                            : "Drop Branch"}
+                        {
+                            rentalType ===
+                            "with_driver"
+                                ? "Drop Location"
+                                : "Drop Branch"
+                        }
 
                     </label>
 
 
-                    {rentalType ===
-                    "with_driver" ? (
+                    {rentalType === "with_driver" ? (
 
                         <input
                             type="text"
@@ -1622,90 +2687,63 @@ const BookingForm = ({
 
                     ) : (
 
-                        <Select
+                        <select
+                            {...register(
+                                "drop_branch_id"
+                            )}
 
-                            key={`drop-branch-${defaultValues?.id ?? "new"}-${dropBranchId}`}
-
-                            value={
-                                dropBranchId || ""
-                            }
-
-                            onValueChange={
-                                (value) => {
-
-                                    setValue(
-                                        "drop_branch_id",
-                                        value,
-                                        {
-                                            shouldValidate:
-                                                true,
-                                            shouldDirty:
-                                                true,
-                                        }
-                                    );
-
-                                }
-                            }
+                            className="
+                                form-input
+                                w-full
+                            "
                         >
 
-                            <SelectTrigger
-                                className="
-                                    w-full
-                                    h-11
-                                    rounded-lg
-                                    border-gray-300
-                                "
-                            >
+                            <option value="">
+                                Select drop branch
+                            </option>
 
-                                <SelectValue
-                                    placeholder="Select drop branch"
-                                />
 
-                            </SelectTrigger>
+                            {branchList.map(
+                                (branch) => {
 
-                            <SelectContent>
-
-                                {branchList.map(
-                                    (branch) => {
-
-                                        const branchId =
-                                            normalizeId(
-                                                branch.id
-                                            );
-
-                                        return (
-
-                                            <SelectItem
-                                                key={
-                                                    branchId
-                                                }
-
-                                                value={
-                                                    branchId
-                                                }
-                                            >
-                                                {
-                                                    branch.name
-                                                }
-                                            </SelectItem>
-
+                                    const branchId =
+                                        normalizeId(
+                                            branch?.id
                                         );
 
-                                    }
-                                )}
+                                    return (
 
-                            </SelectContent>
+                                        <option
+                                            key={
+                                                branchId
+                                            }
 
-                        </Select>
+                                            value={
+                                                branchId
+                                            }
+                                        >
+                                            {
+                                                branch?.name
+                                            }
+                                        </option>
+
+                                    );
+                                }
+                            )}
+
+                        </select>
 
                     )}
 
+
                     <p className="error-text">
 
-                        {rentalType ===
-                        "with_driver"
-                            ? errors.drop_location?.message
-                            : errors.drop_branch_id?.message}
+                        {
+                            rentalType ===
+                            "with_driver"
+                                ? errors.drop_location?.message
+                                : errors.drop_branch_id?.message
+                        }
 
                     </p>
 
@@ -1722,6 +2760,7 @@ const BookingForm = ({
                         Pickup Date &amp; Time
                     </label>
 
+
                     <input
                         type="datetime-local"
 
@@ -1731,6 +2770,7 @@ const BookingForm = ({
 
                         className="form-input"
                     />
+
 
                     <p className="error-text">
                         {
@@ -1751,6 +2791,7 @@ const BookingForm = ({
                         Expected Return
                     </label>
 
+
                     <input
                         type="datetime-local"
 
@@ -1760,6 +2801,7 @@ const BookingForm = ({
 
                         className="form-input"
                     />
+
 
                     <p className="error-text">
                         {
@@ -1771,7 +2813,7 @@ const BookingForm = ({
 
 
                 {/* =================================================
-                    QUOTED
+                    QUOTED AMOUNT
                 ================================================= */}
 
                 <div>
@@ -1779,6 +2821,7 @@ const BookingForm = ({
                     <label className="form-label">
                         Quoted Amount
                     </label>
+
 
                     <input
                         type="number"
@@ -1790,6 +2833,7 @@ const BookingForm = ({
 
                         className="form-input"
                     />
+
 
                     <p className="error-text">
                         {
@@ -1810,6 +2854,7 @@ const BookingForm = ({
                         Discount Amount
                     </label>
 
+
                     <input
                         type="number"
                         step="0.01"
@@ -1821,6 +2866,7 @@ const BookingForm = ({
                         className="form-input"
                     />
 
+
                     <p className="error-text">
                         {
                             errors.discount_amount?.message
@@ -1831,7 +2877,7 @@ const BookingForm = ({
 
 
                 {/* =================================================
-                    FINAL
+                    FINAL AMOUNT
                 ================================================= */}
 
                 <div>
@@ -1839,6 +2885,7 @@ const BookingForm = ({
                     <label className="form-label">
                         Final Amount
                     </label>
+
 
                     <input
                         type="number"
@@ -1857,6 +2904,7 @@ const BookingForm = ({
                             cursor-not-allowed
                         "
                     />
+
 
                     <p className="error-text">
                         {
@@ -1877,6 +2925,7 @@ const BookingForm = ({
                         Customer Notes
                     </label>
 
+
                     <textarea
                         {...register(
                             "customer_notes"
@@ -1891,6 +2940,7 @@ const BookingForm = ({
 
                         placeholder="Notes from the customer (optional)"
                     />
+
 
                     <p className="error-text">
                         {
@@ -1911,6 +2961,7 @@ const BookingForm = ({
                         Admin Notes
                     </label>
 
+
                     <textarea
                         {...register(
                             "admin_notes"
@@ -1925,6 +2976,7 @@ const BookingForm = ({
 
                         placeholder="Internal notes (optional)"
                     />
+
 
                     <p className="error-text">
                         {
@@ -1948,6 +3000,7 @@ const BookingForm = ({
                     gap-3
                     pt-5
                     border-t
+                    border-gray-200
                 "
             >
 
@@ -1963,6 +3016,7 @@ const BookingForm = ({
                         py-2.5
                         rounded-lg
                         border
+                        border-gray-300
                         hover:bg-gray-50
                     "
                 >
@@ -1986,13 +3040,13 @@ const BookingForm = ({
                         text-white
                         hover:bg-blue-700
                         disabled:opacity-50
+                        disabled:cursor-not-allowed
                     "
                 >
 
-                    {isSubmitting ||
-                    isLoading
+                    {isSubmitting || isLoading
                         ? "Saving..."
-                        : defaultValues
+                        : isEditMode
                             ? "Update Booking"
                             : "Create Booking"}
 

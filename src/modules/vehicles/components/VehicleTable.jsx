@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
     useReactTable,
@@ -22,12 +22,25 @@ const VehicleTable = ({
     vehicles = [],
     columns = [],
     loading = false,
+    toolbarRight,
 }) => {
-    const [sorting, setSorting] = useState([]);
-    const [globalFilter, setGlobalFilter] = useState("");
+    const [sorting, setSorting] =
+        useState([]);
+
+    const [globalFilter, setGlobalFilter] =
+        useState("");
+
+    /*
+    |--------------------------------------------------------------------------
+    | React Table
+    |--------------------------------------------------------------------------
+    */
 
     const table = useReactTable({
-        data: vehicles,
+        data: Array.isArray(vehicles)
+            ? vehicles
+            : [],
+
         columns,
 
         state: {
@@ -38,168 +51,315 @@ const VehicleTable = ({
         enableSorting: true,
 
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
 
-        getCoreRowModel: getCoreRowModel(),
-        getSortedRowModel: getSortedRowModel(),
-        getFilteredRowModel: getFilteredRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
+        onGlobalFilterChange:
+            setGlobalFilter,
+
+        getCoreRowModel:
+            getCoreRowModel(),
+
+        getSortedRowModel:
+            getSortedRowModel(),
+
+        getFilteredRowModel:
+            getFilteredRowModel(),
+
+        getPaginationRowModel:
+            getPaginationRowModel(),
+
+        initialState: {
+            pagination: {
+                pageSize: 10,
+                pageIndex: 0,
+            },
+        },
     });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Reset pagination when search/data changes
+    |--------------------------------------------------------------------------
+    */
+
+    useEffect(() => {
+        table.setPageIndex(0);
+    }, [globalFilter, vehicles.length]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Render
+    |--------------------------------------------------------------------------
+    */
 
     return (
         <div className="space-y-5">
 
-            {/* Search */}
-            <input
-                value={globalFilter ?? ""}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                placeholder="Search vehicles..."
+            {/* Search + Status */}
+            <div
                 className="
-                    border
-                    rounded-lg
-                    px-4
-                    py-2
-                    w-full
-                    bg-white
-                    md:w-96"/>
+                    flex
+                    flex-col
+                    gap-3
+                    md:flex-row
+                    md:items-center
+                    md:justify-between
+                "
+            >
+
+                {/* Search */}
+                <input
+                    value={
+                        globalFilter ?? ""
+                    }
+                    onChange={(e) =>
+                        setGlobalFilter(
+                            e.target.value
+                        )
+                    }
+                    placeholder="Search vehicles..."
+                    className="
+                        w-full
+                        rounded-lg
+                        border
+                        border-gray-300
+                        bg-white
+                        px-4
+                        py-2.5
+                        outline-none
+                        focus:border-blue-500
+                        focus:ring-2
+                        focus:ring-blue-100
+                        md:w-96
+                    "
+                />
+
+                {/* Status badges */}
+                {toolbarRight && (
+                    <div
+                        className="
+                            flex
+                            flex-wrap
+                            items-center
+                            gap-2
+                            md:justify-end
+                        "
+                    >
+                        {toolbarRight}
+                    </div>
+                )}
+
+            </div>
 
             {/* Table */}
             <div
                 className="
-                    border
-                    rounded-xl
                     overflow-hidden
-                    bg-white">
+                    rounded-xl
+                    border
+                    bg-white
+                "
+            >
                 <Table>
 
                     {/* Header */}
                     <TableHeader>
                         {table
                             .getHeaderGroups()
-                            .map((headerGroup) => (
-                                <TableRow key={headerGroup.id}>
+                            .map(
+                                (
+                                    headerGroup
+                                ) => (
+                                    <TableRow
+                                        key={
+                                            headerGroup.id
+                                        }
+                                    >
 
-                                    {/* Serial Number */}
-                                    <TableHead
-                                        className="
-                                            w-16
-                                            text-center
-                                            bg-gray-100
-                                            font-semibold">
-                                        S.N.
-                                    </TableHead>
-
-                                    {headerGroup.headers.map((header) => (
+                                        {/* S.N. */}
                                         <TableHead
-                                            key={header.id}
-                                            onClick={
-                                                header.column.getToggleSortingHandler()
-                                            }
                                             className="
-                                                cursor-pointer
+                                                w-16
                                                 bg-gray-100
-                                                font-semibold">
-                                            <div className="flex items-center gap-2">
-
-                                                {header.isPlaceholder
-                                                    ? null
-                                                    : flexRender(
-                                                          header.column
-                                                              .columnDef
-                                                              .header,
-                                                          header.getContext()
-                                                      )}
-
-                                                {header.column.getIsSorted() ===
-                                                    "asc" && (
-                                                    <span>⬆️</span>
-                                                )}
-
-                                                {header.column.getIsSorted() ===
-                                                    "desc" && (
-                                                    <span>⬇️</span>
-                                                )}
-                                            </div>
+                                                text-center
+                                                font-semibold
+                                            "
+                                        >
+                                            S.N.
                                         </TableHead>
-                                    ))}
 
-                                </TableRow>
-                            ))}
+                                        {headerGroup.headers.map(
+                                            (
+                                                header
+                                            ) => {
+                                                const canSort =
+                                                    header.column.getCanSort();
+
+                                                return (
+                                                    <TableHead
+                                                        key={
+                                                            header.id
+                                                        }
+                                                        onClick={
+                                                            canSort
+                                                                ? header.column.getToggleSortingHandler()
+                                                                : undefined
+                                                        }
+                                                        className={`
+                                                            bg-gray-100
+                                                            font-semibold
+                                                            ${
+                                                                canSort
+                                                                    ? "cursor-pointer select-none"
+                                                                    : ""
+                                                            }
+                                                        `}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+
+                                                            {header.isPlaceholder
+                                                                ? null
+                                                                : flexRender(
+                                                                      header
+                                                                          .column
+                                                                          .columnDef
+                                                                          .header,
+                                                                      header.getContext()
+                                                                  )}
+
+                                                            {header.column.getIsSorted() ===
+                                                                "asc" && (
+                                                                <span>
+                                                                    ↑
+                                                                </span>
+                                                            )}
+
+                                                            {header.column.getIsSorted() ===
+                                                                "desc" && (
+                                                                <span>
+                                                                    ↓
+                                                                </span>
+                                                            )}
+
+                                                        </div>
+                                                    </TableHead>
+                                                );
+                                            }
+                                        )}
+
+                                    </TableRow>
+                                )
+                            )}
                     </TableHeader>
 
                     {/* Body */}
                     <TableBody>
 
-                        {/* Loading */}
                         {loading ? (
                             <TableRow>
                                 <TableCell
-                                    colSpan={columns.length + 1}
+                                    colSpan={
+                                        columns.length +
+                                        1
+                                    }
                                     className="
                                         py-10
                                         text-center
-                                        text-gray-500">
+                                        text-gray-500
+                                    "
+                                >
                                     Loading vehicles...
                                 </TableCell>
                             </TableRow>
-                        ) : table.getRowModel().rows.length === 0 ? (
-
-                            /* Empty */
+                        ) : table.getRowModel()
+                              .rows.length ===
+                          0 ? (
                             <TableRow>
                                 <TableCell
-                                    colSpan={columns.length + 1}
+                                    colSpan={
+                                        columns.length +
+                                        1
+                                    }
                                     className="
                                         py-10
                                         text-center
-                                        text-gray-500">
+                                        text-gray-500
+                                    "
+                                >
                                     No vehicles found.
                                 </TableCell>
                             </TableRow>
-
                         ) : (
-
-                            /* Rows */
                             table
                                 .getRowModel()
                                 .rows
-                                .map((row, index) => {
+                                .map(
+                                    (
+                                        row,
+                                        index
+                                    ) => {
 
-                                    const serialNumber =
-                                        table.getState().pagination.pageIndex *
-                                            table.getState().pagination.pageSize +
-                                        index +
-                                        1;
+                                        const serialNumber =
+                                            table.getState()
+                                                .pagination
+                                                .pageIndex *
+                                                table.getState()
+                                                    .pagination
+                                                    .pageSize +
+                                            index +
+                                            1;
 
-                                    return (
-                                        <TableRow key={row.id}>
+                                        return (
+                                            <TableRow
+                                                key={
+                                                    row.id
+                                                }
+                                            >
 
-                                            {/* Serial Number */}
-                                            <TableCell
-                                                className="
-                                                    w-16
-                                                    text-center
-                                                    font-medium
-                                                    text-gray-600">
-                                                {serialNumber}
-                                            </TableCell>
+                                                {/* S.N. */}
+                                                <TableCell
+                                                    className="
+                                                        w-16
+                                                        text-center
+                                                        font-medium
+                                                        text-gray-600
+                                                    "
+                                                >
+                                                    {
+                                                        serialNumber
+                                                    }
+                                                </TableCell>
 
-                                            {/* Vehicle Columns */}
-                                            {row
-                                                .getVisibleCells()
-                                                .map((cell) => (
-                                                    <TableCell
-                                                        key={cell.id}
-                                                        className="text-sm text-gray-700"
-                                                    >
-                                                        {flexRender(
-                                                            cell.column.columnDef.cell,
-                                                            cell.getContext()
-                                                        )}
-                                                    </TableCell>
-                                                ))}
-                                        </TableRow>
-                                    );
-                                })
+                                                {/* Cells */}
+                                                {row
+                                                    .getVisibleCells()
+                                                    .map(
+                                                        (
+                                                            cell
+                                                        ) => (
+                                                            <TableCell
+                                                                key={
+                                                                    cell.id
+                                                                }
+                                                                className="
+                                                                    text-sm
+                                                                    text-gray-700
+                                                                "
+                                                            >
+                                                                {flexRender(
+                                                                    cell
+                                                                        .column
+                                                                        .columnDef
+                                                                        .cell,
+                                                                    cell.getContext()
+                                                                )}
+                                                            </TableCell>
+                                                        )
+                                                    )}
+
+                                            </TableRow>
+                                        );
+                                    }
+                                )
                         )}
 
                     </TableBody>
@@ -214,70 +374,101 @@ const VehicleTable = ({
                     flex-col
                     gap-4
                     md:flex-row
+                    md:items-center
                     md:justify-between
-                    md:items-center">
+                "
+            >
 
-                {/* Showing information */}
+                {/* Showing */}
                 <div className="text-sm text-gray-600">
                     Showing{" "}
-                    {table.getRowModel().rows.length}{" "}
+                    <strong>
+                        {
+                            table.getRowModel()
+                                .rows.length
+                        }
+                    </strong>{" "}
                     of{" "}
-                    {table.getFilteredRowModel().rows.length}{" "}
+                    <strong>
+                        {
+                            table.getFilteredRowModel()
+                                .rows.length
+                        }
+                    </strong>{" "}
                     vehicles
                 </div>
 
                 {/* Pagination */}
                 <div className="flex items-center gap-2">
 
-                    {/* Previous */}
                     <button
                         type="button"
-                        disabled={!table.getCanPreviousPage()}
-                        onClick={() => table.previousPage()}
+                        disabled={
+                            !table.getCanPreviousPage()
+                        }
+                        onClick={() =>
+                            table.previousPage()
+                        }
                         className="
-                            px-4
-                            py-1
-                            bg-blue-600
-                            text-white
-                            border
                             rounded
+                            border
+                            bg-blue-600
+                            px-4
+                            py-2
                             text-sm
+                            text-white
+                            transition
                             hover:bg-blue-700
+                            disabled:cursor-not-allowed
                             disabled:opacity-50
-                            cursor-pointer
-                         ">
+                        "
+                    >
                         Previous
                     </button>
 
-                    {/* Page */}
                     <span
                         className="
+                            whitespace-nowrap
                             px-3
                             py-2
                             text-sm
-                            whitespace-nowrap text-gray-600">
+                            text-gray-600
+                        "
+                    >
                         Page{" "}
-                        {table.getState().pagination.pageIndex + 1}{" "}
+                        {table.getState()
+                            .pagination
+                            .pageIndex + 1}{" "}
                         of{" "}
-                        {table.getPageCount()}
+                        {Math.max(
+                            table.getPageCount(),
+                            1
+                        )}
                     </span>
 
-                    {/* Next */}
                     <button
                         type="button"
-                        disabled={!table.getCanNextPage()}
-                        onClick={() => table.nextPage()}
+                        disabled={
+                            !table.getCanNextPage()
+                        }
+                        onClick={() =>
+                            table.nextPage()
+                        }
                         className="
-                            px-4
-                            py-1
-                            bg-blue-600
-                            text-white
-                            border
-                            rounded
-                            text-sm
                             cursor-pointer
+                            rounded
+                            border
+                            bg-blue-600
+                            px-4
+                            py-2
+                            text-sm
+                            text-white
+                            transition
                             hover:bg-blue-700
-                            disabled:opacity-50">
+                            disabled:cursor-not-allowed
+                            disabled:opacity-50
+                        "
+                    >
                         Next
                     </button>
 
@@ -290,4 +481,3 @@ const VehicleTable = ({
 };
 
 export default VehicleTable;
-

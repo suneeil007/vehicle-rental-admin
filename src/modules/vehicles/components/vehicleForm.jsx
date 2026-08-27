@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-import { Button } from "@/components/ui/button";
-
 import {
     Popover,
     PopoverContent,
@@ -27,15 +25,17 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 
-import { Check, ChevronsUpDown } from "lucide-react";
+import {
+    Check,
+    ChevronsUpDown,
+    ExternalLink,
+} from "lucide-react";
 
 import MultiImageUpload from "@/components/ui/MultiImageUpload";
 
 import { vehicleSchema } from "../validation/vehicleSchema";
 import useVehicleCategories from "../../vehicleCategories/hooks/useVehicleCategories";
 import useSetFeaturedImage from "../hooks/useSetFeaturedImage";
-
-// Adjust the import paths above to match your actual folder structure.
 
 const TRANSMISSION_OPTIONS = [
     { value: "manual", label: "Manual" },
@@ -49,13 +49,45 @@ const FUEL_TYPE_OPTIONS = [
     { value: "hybrid", label: "Hybrid" },
 ];
 
+/*
+|--------------------------------------------------------------------------
+| Status options
+|--------------------------------------------------------------------------
+|
+| These are the statuses that can be manually changed by the admin.
+|
+| "booked" and "on_trip" are system-managed statuses.
+| They are automatically calculated from the vehicle's active trip.
+|
+*/
+
 const STATUS_OPTIONS = [
     { value: "available", label: "Available" },
-    { value: "booked", label: "Booked" },
     { value: "maintenance", label: "Maintenance" },
     { value: "inactive", label: "Inactive" },
 ];
 
+/*
+|--------------------------------------------------------------------------
+| System status labels
+|--------------------------------------------------------------------------
+*/
+
+const SYSTEM_STATUS_LABELS = {
+    booked: "Booked",
+    on_trip: "On trip",
+};
+
+/*
+|--------------------------------------------------------------------------
+| System status styles
+|--------------------------------------------------------------------------
+*/
+
+const SYSTEM_STATUS_STYLES = {
+    booked: "bg-blue-100 text-blue-700",
+    on_trip: "bg-orange-100 text-orange-700",
+};
 
 const VehicleForm = ({
     defaultValues,
@@ -63,8 +95,6 @@ const VehicleForm = ({
     onCancel,
     isLoading = false,
 }) => {
-
-    // console.log("EDIT VEHICLE DATA:", defaultValues)
     const { data: categories } = useVehicleCategories();
 
     const setFeaturedMutation = useSetFeaturedImage();
@@ -74,6 +104,51 @@ const VehicleForm = ({
     const [removedImageIds, setRemovedImageIds] = useState([]);
     const [featuredNewIndex, setFeaturedNewIndex] = useState(null);
 
+    /*
+    |--------------------------------------------------------------------------
+    | Effective status
+    |--------------------------------------------------------------------------
+    |
+    | For editing:
+    |
+    | effective_status = actual current vehicle status
+    |
+    | Example:
+    |
+    | database status  = available
+    | active trip       = on_trip
+    |
+    | effective status  = on_trip
+    |
+    */
+
+    const rawDefaultStatus = defaultValues?.effective_status
+        ? String(defaultValues.effective_status).toLowerCase()
+        : defaultValues?.status
+        ? String(defaultValues.status).toLowerCase()
+        : "available";
+
+    /*
+    |--------------------------------------------------------------------------
+    | System managed status
+    |--------------------------------------------------------------------------
+    |
+    | booked and on_trip cannot be manually changed.
+    |
+    */
+
+    const isSystemManagedStatus =
+        Boolean(defaultValues) &&
+        ["booked", "on_trip"].includes(rawDefaultStatus);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Active trip
+    |--------------------------------------------------------------------------
+    */
+
+    const activeTrip = defaultValues?.active_trip ?? null;
+
     const {
         register,
         handleSubmit,
@@ -82,7 +157,13 @@ const VehicleForm = ({
         watch,
         formState: { errors, isSubmitting },
     } = useForm({
-        resolver: zodResolver(vehicleSchema(Boolean(defaultValues))),
+        resolver: zodResolver(
+            vehicleSchema(
+                Boolean(defaultValues),
+                isSystemManagedStatus
+            )
+        ),
+
         defaultValues: {
             vehicle_category_id: "",
             name: "",
@@ -106,6 +187,11 @@ const VehicleForm = ({
     const status = watch("status");
     const categoryId = watch("vehicle_category_id");
 
+    /*
+    |--------------------------------------------------------------------------
+    | Reset form when editing
+    |--------------------------------------------------------------------------
+    */
 
     useEffect(() => {
         if (!defaultValues) return;
@@ -120,8 +206,19 @@ const VehicleForm = ({
                 ? String(defaultValues.fuel_type).toLowerCase()
                 : "";
 
+        /*
+        |--------------------------------------------------------------------------
+        | IMPORTANT:
+        | Use effective_status instead of database status.
+        |--------------------------------------------------------------------------
+        */
+
         const statusValue =
-            defaultValues.status
+            defaultValues.effective_status
+                ? String(
+                      defaultValues.effective_status
+                  ).toLowerCase()
+                : defaultValues.status
                 ? String(defaultValues.status).toLowerCase()
                 : "available";
 
@@ -134,23 +231,34 @@ const VehicleForm = ({
             brand: defaultValues.brand ?? "",
             model: defaultValues.model ?? "",
 
-            manufacture_year: defaultValues.manufacture_year
-                ? String(defaultValues.manufacture_year)
-                : "",
+            manufacture_year:
+                defaultValues.manufacture_year
+                    ? String(
+                          defaultValues.manufacture_year
+                      )
+                    : "",
 
             transmission: transmissionValue,
             fuel_type: fuelTypeValue,
 
-            seat_capacity: defaultValues.seat_capacity ?? "",
-            price_per_day: defaultValues.price_per_day ?? "",
-            registration_number: defaultValues.registration_number ?? "",
+            seat_capacity:
+                defaultValues.seat_capacity ?? "",
+
+            price_per_day:
+                defaultValues.price_per_day ?? "",
+
+            registration_number:
+                defaultValues.registration_number ?? "",
 
             mileage: defaultValues.mileage
                 ? String(defaultValues.mileage)
                 : "",
 
             color: defaultValues.color ?? "",
-            description: defaultValues.description ?? "",
+
+            description:
+                defaultValues.description ?? "",
+
             status: statusValue,
         });
 
@@ -167,6 +275,11 @@ const VehicleForm = ({
         );
     }, [defaultValues, reset]);
 
+    /*
+    |--------------------------------------------------------------------------
+    | Set existing image as featured
+    |--------------------------------------------------------------------------
+    */
 
     const handleSetFeatured = (imageId) => {
         setFeaturedMutation.mutate(imageId, {
@@ -181,13 +294,42 @@ const VehicleForm = ({
         });
     };
 
+    /*
+    |--------------------------------------------------------------------------
+    | Submit
+    |--------------------------------------------------------------------------
+    */
 
     const submitHandler = (data) => {
-        onSubmit({
+        const payload = {
             ...data,
+        };
+
+        /*
+        |--------------------------------------------------------------------------
+        | IMPORTANT:
+        |
+        | If vehicle is currently booked or on_trip,
+        | status must NOT be sent back to the API.
+        |
+        | The backend controls this status through the active trip.
+        |--------------------------------------------------------------------------
+        */
+
+        if (isSystemManagedStatus) {
+            delete payload.status;
+        }
+
+        onSubmit({
+            ...payload,
+
             images: newImages,
-            removed_image_ids: removedImageIds,
-            featured_new_index: featuredNewIndex,
+
+            removed_image_ids:
+                removedImageIds,
+
+            featured_new_index:
+                featuredNewIndex,
         });
     };
 
@@ -196,7 +338,10 @@ const VehicleForm = ({
             onSubmit={handleSubmit(
                 (data) => submitHandler(data),
                 (validationErrors) => {
-                    console.log("VALIDATION ERRORS:", validationErrors);
+                    console.log(
+                        "VALIDATION ERRORS:",
+                        validationErrors
+                    );
                 }
             )}
             className="
@@ -205,294 +350,578 @@ const VehicleForm = ({
                 rounded-xl
                 shadow-sm
                 p-6
-                space-y-6">
-
+                space-y-6
+            "
+        >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
+                {/* Category */}
+                <div className="w-full">
+                    <label className="form-label">
+                        Category
+                    </label>
 
-            {/* Category */}
-            <div className="w-full">
-                <label className="form-label">Category</label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <button
+                                type="button"
+                                role="combobox"
+                                className="
+                                    form-input
+                                    w-full
+                                    flex
+                                    items-center
+                                    justify-between
+                                    text-left
+                                    font-normal
+                                "
+                            >
+                                <span className="truncate">
+                                    {categoryId
+                                        ? categories?.find(
+                                              (cat) =>
+                                                  String(
+                                                      cat.id
+                                                  ) ===
+                                                  String(
+                                                      categoryId
+                                                  )
+                                          )?.name
+                                        : "Select category"}
+                                </span>
 
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <button
-                            type="button"
-                            role="combobox"
-                            className="form-input w-full flex items-center justify-between text-left font-normal"
+                                <ChevronsUpDown
+                                    className="
+                                        ml-2
+                                        h-4
+                                        w-4
+                                        shrink-0
+                                        opacity-50
+                                    "
+                                />
+                            </button>
+                        </PopoverTrigger>
+
+                        <PopoverContent
+                            align="start"
+                            className="
+                                w-[var(--radix-popover-trigger-width)]
+                                min-w-0
+                                p-0
+                            "
                         >
-                            <span className="truncate">
-                                {categoryId
-                                    ? categories?.find(
-                                        (cat) =>
-                                            String(cat.id) === String(categoryId)
-                                    )?.name
-                                    : "Select category"}
-                            </span>
+                            <Command className="w-full">
+                                <CommandInput
+                                    placeholder="Search category..."
+                                />
 
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </button>
-                    </PopoverTrigger>
+                                <CommandList className="w-full">
+                                    <CommandEmpty>
+                                        No category found.
+                                    </CommandEmpty>
 
-                    <PopoverContent
-                        align="start"
-                        className="w-[var(--radix-popover-trigger-width)] min-w-0 p-0"
-                    >
-                        <Command className="w-full">
-                            <CommandInput
-                                placeholder="Search category..."
-                            />
-
-                            <CommandList className="w-full">
-                                <CommandEmpty>
-                                    No category found.
-                                </CommandEmpty>
-
-                                <CommandGroup className="w-full">
-                                    {categories?.map((cat) => (
-                                        <CommandItem
-                                            key={cat.id}
-                                            value={cat.name}
-                                            className="w-full"
-                                            onSelect={() => {
-                                                setValue(
-                                                    "vehicle_category_id",
-                                                    String(cat.id),
-                                                    {
-                                                        shouldValidate: true,
-                                                        shouldDirty: true,
+                                    <CommandGroup className="w-full">
+                                        {categories?.map(
+                                            (cat) => (
+                                                <CommandItem
+                                                    key={cat.id}
+                                                    value={
+                                                        cat.name
                                                     }
-                                                );
-                                            }}
-                                        >
-                                            <Check
-                                                className={`mr-2 h-4 w-0 ${
-                                                    String(categoryId) ===
-                                                    String(cat.id)
-                                                        ? "opacity-100"
-                                                        : "opacity-0"
-                                                }`}
-                                            />
+                                                    className="w-full"
+                                                    onSelect={() => {
+                                                        setValue(
+                                                            "vehicle_category_id",
+                                                            String(
+                                                                cat.id
+                                                            ),
+                                                            {
+                                                                shouldValidate:
+                                                                    true,
+                                                                shouldDirty:
+                                                                    true,
+                                                            }
+                                                        );
+                                                    }}
+                                                >
+                                                    <Check
+                                                        className={`
+                                                            mr-2
+                                                            h-4
+                                                            w-0
+                                                            ${
+                                                                String(
+                                                                    categoryId
+                                                                ) ===
+                                                                String(
+                                                                    cat.id
+                                                                )
+                                                                    ? "opacity-100"
+                                                                    : "opacity-0"
+                                                            }
+                                                        `}
+                                                    />
 
-                                            <span className="truncate">
-                                                {cat.name}
-                                            </span>
-                                        </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                            </CommandList>
-                        </Command>
-                    </PopoverContent>
-                </Popover>
+                                                    <span className="truncate">
+                                                        {
+                                                            cat.name
+                                                        }
+                                                    </span>
+                                                </CommandItem>
+                                            )
+                                        )}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
 
-                <p className="error-text">
-                    {errors.vehicle_category_id?.message}
-                </p>
-            </div>
-
-
+                    <p className="error-text">
+                        {
+                            errors
+                                .vehicle_category_id
+                                ?.message
+                        }
+                    </p>
+                </div>
 
                 {/* Name */}
                 <div>
-                    <label className="form-label">Vehicle Name</label>
+                    <label className="form-label">
+                        Vehicle Name
+                    </label>
+
                     <input
                         {...register("name")}
                         className="form-input"
                         placeholder=""
                     />
-                    <p className="error-text">{errors.name?.message}</p>
+
+                    <p className="error-text">
+                        {errors.name?.message}
+                    </p>
                 </div>
 
                 {/* Brand */}
                 <div>
-                    <label className="form-label">Brand</label>
+                    <label className="form-label">
+                        Brand
+                    </label>
+
                     <input
                         {...register("brand")}
                         className="form-input"
                         placeholder=""
                     />
-                    <p className="error-text">{errors.brand?.message}</p>
+
+                    <p className="error-text">
+                        {errors.brand?.message}
+                    </p>
                 </div>
 
                 {/* Model */}
                 <div>
-                    <label className="form-label">Model</label>
+                    <label className="form-label">
+                        Model
+                    </label>
+
                     <input
                         {...register("model")}
                         className="form-input"
                         placeholder=""
                     />
-                    <p className="error-text">{errors.model?.message}</p>
+
+                    <p className="error-text">
+                        {errors.model?.message}
+                    </p>
                 </div>
 
                 {/* Manufacture Year */}
                 <div>
-                    <label className="form-label">Manufacture Year</label>
+                    <label className="form-label">
+                        Manufacture Year
+                    </label>
+
                     <input
-                        {...register("manufacture_year")}
+                        {...register(
+                            "manufacture_year"
+                        )}
                         className="form-input"
                         placeholder=""
                         maxLength={4}
                     />
-                    <p className="error-text">{errors.manufacture_year?.message}</p>
+
+                    <p className="error-text">
+                        {
+                            errors.manufacture_year
+                                ?.message
+                        }
+                    </p>
                 </div>
 
                 {/* Transmission */}
-                    <div>
-                        <label className="form-label">Transmission</label>
+                <div>
+                    <label className="form-label">
+                        Transmission
+                    </label>
 
-                        <Select
-                            key={`transmission-${defaultValues?.id ?? "new"}-${transmission}`}
-                            value={transmission || ""}
-                            onValueChange={(value) =>
-                                setValue("transmission", value, {
+                    <Select
+                        key={`transmission-${
+                            defaultValues?.id ?? "new"
+                        }-${transmission}`}
+                        value={transmission || ""}
+                        onValueChange={(value) =>
+                            setValue(
+                                "transmission",
+                                value,
+                                {
                                     shouldValidate: true,
                                     shouldDirty: true,
-                                })
-                            }
+                                }
+                            )
+                        }
+                    >
+                        <SelectTrigger
+                            className="
+                                w-full
+                                h-11
+                                rounded-lg
+                                border-gray-300
+                            "
                         >
-                            <SelectTrigger className="w-full h-11 rounded-lg border-gray-300">
-                                <SelectValue placeholder="Select transmission" />
-                            </SelectTrigger>
+                            <SelectValue placeholder="Select transmission" />
+                        </SelectTrigger>
 
-                            <SelectContent>
-                                {TRANSMISSION_OPTIONS.map((opt) => (
-                                    <SelectItem key={opt.value} value={opt.value}>
+                        <SelectContent>
+                            {TRANSMISSION_OPTIONS.map(
+                                (opt) => (
+                                    <SelectItem
+                                        key={opt.value}
+                                        value={opt.value}
+                                    >
                                         {opt.label}
                                     </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                                )
+                            )}
+                        </SelectContent>
+                    </Select>
 
-                        <p className="error-text">{errors.transmission?.message}</p>
-                    </div>
+                    <p className="error-text">
+                        {
+                            errors.transmission
+                                ?.message
+                        }
+                    </p>
+                </div>
 
                 {/* Fuel Type */}
                 <div>
-                    <label className="form-label">Fuel Type</label>
+                    <label className="form-label">
+                        Fuel Type
+                    </label>
 
                     <Select
-                        key={`fuel-${defaultValues?.id ?? "new"}-${fuelType}`}
+                        key={`fuel-${
+                            defaultValues?.id ?? "new"
+                        }-${fuelType}`}
                         value={fuelType || ""}
                         onValueChange={(value) =>
-                            setValue("fuel_type", value, {
-                                shouldValidate: true,
-                                shouldDirty: true,
-                            })
+                            setValue(
+                                "fuel_type",
+                                value,
+                                {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                }
+                            )
                         }
                     >
-                        <SelectTrigger className="w-full h-11 rounded-lg border-gray-300">
+                        <SelectTrigger
+                            className="
+                                w-full
+                                h-11
+                                rounded-lg
+                                border-gray-300
+                            "
+                        >
                             <SelectValue placeholder="Select fuel type" />
                         </SelectTrigger>
 
                         <SelectContent>
-                            {FUEL_TYPE_OPTIONS.map((opt) => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                </SelectItem>
-                            ))}
+                            {FUEL_TYPE_OPTIONS.map(
+                                (opt) => (
+                                    <SelectItem
+                                        key={opt.value}
+                                        value={opt.value}
+                                    >
+                                        {opt.label}
+                                    </SelectItem>
+                                )
+                            )}
                         </SelectContent>
                     </Select>
 
-                    <p className="error-text">{errors.fuel_type?.message}</p>
+                    <p className="error-text">
+                        {errors.fuel_type?.message}
+                    </p>
                 </div>
 
                 {/* Seat Capacity */}
                 <div>
-                    <label className="form-label">Seat Capacity</label>
+                    <label className="form-label">
+                        Seat Capacity
+                    </label>
+
                     <input
                         type="number"
                         {...register("seat_capacity")}
                         className="form-input"
                         placeholder=""
                     />
-                    <p className="error-text">{errors.seat_capacity?.message}</p>
+
+                    <p className="error-text">
+                        {
+                            errors.seat_capacity
+                                ?.message
+                        }
+                    </p>
                 </div>
 
                 {/* Price Per Day */}
                 <div>
-                    <label className="form-label">Price Per Day</label>
+                    <label className="form-label">
+                        Price Per Day
+                    </label>
+
                     <input
                         type="number"
                         step="0.01"
-                        {...register("price_per_day")}
+                        {...register(
+                            "price_per_day"
+                        )}
                         className="form-input"
                         placeholder=""
                     />
-                    <p className="error-text">{errors.price_per_day?.message}</p>
+
+                    <p className="error-text">
+                        {
+                            errors.price_per_day
+                                ?.message
+                        }
+                    </p>
                 </div>
 
                 {/* Registration Number */}
                 <div>
-                    <label className="form-label">Registration Number</label>
+                    <label className="form-label">
+                        Registration Number
+                    </label>
+
                     <input
-                        {...register("registration_number")}
+                        {...register(
+                            "registration_number"
+                        )}
                         className="form-input"
                         placeholder=""
                     />
-                    <p className="error-text">{errors.registration_number?.message}</p>
+
+                    <p className="error-text">
+                        {
+                            errors
+                                .registration_number
+                                ?.message
+                        }
+                    </p>
                 </div>
 
                 {/* Mileage */}
                 <div>
-                    <label className="form-label">Mileage (km)</label>
+                    <label className="form-label">
+                        Mileage (km)
+                    </label>
+
                     <input
                         type="number"
                         {...register("mileage")}
                         className="form-input"
                         placeholder=""
                     />
-                    <p className="error-text">{errors.mileage?.message}</p>
+
+                    <p className="error-text">
+                        {errors.mileage?.message}
+                    </p>
                 </div>
 
                 {/* Color */}
                 <div>
-                    <label className="form-label">Color</label>
+                    <label className="form-label">
+                        Color
+                    </label>
+
                     <input
                         {...register("color")}
                         className="form-input"
                         placeholder=""
                     />
-                    <p className="error-text">{errors.color?.message}</p>
+
+                    <p className="error-text">
+                        {errors.color?.message}
+                    </p>
                 </div>
 
                 {/* Status */}
                 <div>
-                    <label className="form-label">Status</label>
-                    <Select
-                        key={`status-${defaultValues?.id ?? "new"}-${status}`}
-                        value={status}
-                        onValueChange={(value) =>
-                            setValue("status", value, {
-                                shouldValidate: true,
-                                shouldDirty: true,
-                            })
-                        }
-                    >
-                        <SelectTrigger className="w-full h-11 rounded-lg border-gray-300">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {STATUS_OPTIONS.map((opt) => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <p className="error-text">{errors.status?.message}</p>
+                    <label className="form-label">
+                        Status
+                    </label>
+
+                    {isSystemManagedStatus ? (
+                        <>
+                            {/* System-managed status */}
+                            <div className="h-11 flex items-center">
+                                <span
+                                    className={`
+                                        inline-flex
+                                        items-center
+                                        rounded-full
+                                        px-2.5
+                                        py-1
+                                        text-xs
+                                        font-medium
+                                        ${
+                                            SYSTEM_STATUS_STYLES[
+                                                rawDefaultStatus
+                                            ] ??
+                                            "bg-gray-100 text-gray-600"
+                                        }
+                                    `}
+                                >
+                                    {SYSTEM_STATUS_LABELS[
+                                        rawDefaultStatus
+                                    ] ??
+                                        rawDefaultStatus}
+                                </span>
+                            </div>
+
+                            <p className="text-xs text-gray-500 mt-1">
+                                This vehicle has an
+                                active trip. Status
+                                updates automatically
+                                as the trip progresses.
+                            </p>
+
+                            {/* Active Trip Link */}
+                            {activeTrip?.id && (
+                                <a
+                                    href={`/trips/${
+                                        activeTrip.slug ??
+                                        activeTrip.id
+                                    }`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="
+                                        inline-flex
+                                        items-center
+                                        gap-1.5
+                                        mt-2
+                                        text-sm
+                                        font-medium
+                                        text-[11px] 
+                                        text-blue-600
+                                        hover:text-blue-600
+                                        hover:text-blue-800
+                                    "
+                                >
+                                    View Active Trip
+
+                                    <ExternalLink
+                                        className="
+                                            h-3.5
+                                            w-3.5
+                                        "
+                                    />
+                                </a>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            {/* Manually controlled status */}
+                            <Select
+                                key={`status-${
+                                    defaultValues?.id ??
+                                    "new"
+                                }-${status}`}
+                                value={status}
+                                onValueChange={(value) =>
+                                    setValue(
+                                        "status",
+                                        value,
+                                        {
+                                            shouldValidate:
+                                                true,
+                                            shouldDirty:
+                                                true,
+                                        }
+                                    )
+                                }
+                            >
+                                <SelectTrigger
+                                    className="
+                                        w-full
+                                        h-11
+                                        rounded-lg
+                                        border-gray-300
+                                    "
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+
+                                <SelectContent>
+                                    {STATUS_OPTIONS.map(
+                                        (opt) => (
+                                            <SelectItem
+                                                key={
+                                                    opt.value
+                                                }
+                                                value={
+                                                    opt.value
+                                                }
+                                            >
+                                                {
+                                                    opt.label
+                                                }
+                                            </SelectItem>
+                                        )
+                                    )}
+                                </SelectContent>
+                            </Select>
+
+                            <p className="error-text">
+                                {errors.status?.message}
+                            </p>
+                        </>
+                    )}
                 </div>
 
                 {/* Description */}
                 <div className="md:col-span-3">
-                    <label className="form-label">Description</label>
+                    <label className="form-label">
+                        Description
+                    </label>
+
                     <textarea
                         {...register("description")}
                         rows={4}
-                        className="form-input resize-none"
+                        className="
+                            form-input
+                            resize-none
+                        "
                         placeholder="Enter description"
                     />
-                    <p className="error-text">{errors.description?.message}</p>
+
+                    <p className="error-text">
+                        {errors.description?.message}
+                    </p>
                 </div>
 
                 {/* Images */}
@@ -501,33 +930,80 @@ const VehicleForm = ({
                         label="Vehicle Photos"
                         value={newImages}
                         onChange={setNewImages}
-                        existingImages={existingImages}
+                        existingImages={
+                            existingImages
+                        }
                         onRemoveExisting={(id) => {
-                            setExistingImages((prev) => prev.filter((img) => img.id !== id));
-                            setRemovedImageIds((prev) => [...prev, id]);
+                            setExistingImages(
+                                (prev) =>
+                                    prev.filter(
+                                        (img) =>
+                                            img.id !== id
+                                    )
+                            );
+
+                            setRemovedImageIds(
+                                (prev) => [
+                                    ...prev,
+                                    id,
+                                ]
+                            );
                         }}
-                        onSetFeatured={handleSetFeatured}
-                        featuredNewIndex={featuredNewIndex}
-                        onSetNewFeatured={setFeaturedNewIndex}
+                        onSetFeatured={
+                            handleSetFeatured
+                        }
+                        featuredNewIndex={
+                            featuredNewIndex
+                        }
+                        onSetNewFeatured={
+                            setFeaturedNewIndex
+                        }
                         maxFiles={8}
                     />
                 </div>
-
             </div>
 
-            <div className="flex justify-end gap-3 pt-5 border-t">
+            {/* Form Buttons */}
+            <div
+                className="
+                    flex
+                    justify-end
+                    gap-3
+                    pt-5
+                    border-t
+                "
+            >
                 <button
                     type="button"
                     onClick={onCancel}
-                    className="px-5 py-2.5 rounded-lg border hover:bg-gray-50 cursor-pointer"
+                    className="
+                        px-5
+                        py-2.5
+                        rounded-lg
+                        border
+                        hover:bg-gray-50
+                        cursor-pointer
+                    "
                 >
                     Cancel
                 </button>
 
                 <button
                     type="submit"
-                    disabled={isSubmitting || isLoading}
-                    className="px-5 py-2.5 rounded-lg bg-blue-600 cursor-pointer text-white hover:bg-blue-700 disabled:opacity-50"
+                    disabled={
+                        isSubmitting ||
+                        isLoading
+                    }
+                    className="
+                        px-5
+                        py-2.5
+                        rounded-lg
+                        bg-blue-600
+                        cursor-pointer
+                        text-white
+                        hover:bg-blue-700
+                        disabled:opacity-50
+                    "
                 >
                     {isSubmitting || isLoading
                         ? "Saving..."
@@ -536,7 +1012,6 @@ const VehicleForm = ({
                         : "Create Vehicle"}
                 </button>
             </div>
-
         </form>
     );
 };

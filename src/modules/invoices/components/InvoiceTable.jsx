@@ -1,66 +1,507 @@
+import { useEffect, useState } from "react";
+
 import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
+    useReactTable,
+    getCoreRowModel,
+    getSortedRowModel,
+    getFilteredRowModel,
+    getPaginationRowModel,
+    flexRender,
 } from "@tanstack/react-table";
+
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "@/components/ui/table";
 
-export const InvoiceTable = ({ data = [], columns, isLoading }) => {
-  const table = useReactTable({
-    data,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-  });
+const InvoiceTable = ({
+    data = [],
+    columns = [],
+    isLoading = false,
+    toolbarRight,
+}) => {
+    const [sorting, setSorting] = useState([]);
+    const [globalFilter, setGlobalFilter] = useState("");
 
-  if (isLoading) {
+    /*
+    |--------------------------------------------------------------------------
+    | React Table
+    |--------------------------------------------------------------------------
+    */
+
+    const table = useReactTable({
+        data: Array.isArray(data) ? data : [],
+        columns,
+
+        state: {
+            sorting,
+            globalFilter,
+        },
+
+        enableSorting: true,
+
+        onSortingChange: setSorting,
+
+        onGlobalFilterChange: setGlobalFilter,
+
+        getCoreRowModel: getCoreRowModel(),
+
+        getSortedRowModel: getSortedRowModel(),
+
+        getFilteredRowModel: getFilteredRowModel(),
+
+        getPaginationRowModel: getPaginationRowModel(),
+
+        initialState: {
+            pagination: {
+                pageSize: 10,
+                pageIndex: 0,
+            },
+        },
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Reset Pagination
+    |--------------------------------------------------------------------------
+    */
+
+    useEffect(() => {
+        table.setPageIndex(0);
+    }, [globalFilter, data.length]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Render
+    |--------------------------------------------------------------------------
+    */
+
     return (
-      <div className="py-8 text-center text-sm text-muted-foreground">
-        Loading invoices...
-      </div>
-    );
-  }
+        <div className="space-y-5">
 
-  if (!data.length) {
-    return (
-      <div className="py-8 text-center text-sm text-muted-foreground">
-        No invoices found.
-      </div>
-    );
-  }
+            {/* ============================================================ */}
+            {/* SEARCH + TOOLBAR */}
+            {/* ============================================================ */}
 
-  return (
-    <Table>
-      <TableHeader>
-        {table.getHeaderGroups().map((headerGroup) => (
-          <TableRow key={headerGroup.id}>
-            {headerGroup.headers.map((header) => (
-              <TableHead key={header.id}>
-                {header.isPlaceholder
-                  ? null
-                  : flexRender(header.column.columnDef.header, header.getContext())}
-              </TableHead>
-            ))}
-          </TableRow>
-        ))}
-      </TableHeader>
-      <TableBody>
-        {table.getRowModel().rows.map((row) => (
-          <TableRow key={row.id}>
-            {row.getVisibleCells().map((cell) => (
-              <TableCell key={cell.id}>
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </TableCell>
-            ))}
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
+            <div
+                className="
+                    flex
+                    flex-col
+                    gap-3
+                    md:flex-row
+                    md:items-center
+                    md:justify-between
+                "
+            >
+
+                {/* Search */}
+
+                <input
+                    value={globalFilter ?? ""}
+                    onChange={(e) =>
+                        setGlobalFilter(e.target.value)
+                    }
+                    placeholder="Search invoices..."
+                    className="
+                        w-full
+                        rounded-lg
+                        border
+                        border-gray-300
+                        bg-white
+                        px-4
+                        py-2.5
+                        outline-none
+                        focus:border-blue-500
+                        focus:ring-2
+                        focus:ring-blue-100
+                        md:w-96
+                    "
+                />
+
+                {/* Toolbar */}
+
+                {toolbarRight && (
+                    <div
+                        className="
+                            flex
+                            flex-wrap
+                            items-center
+                            gap-2
+                            md:justify-end
+                        "
+                    >
+                        {toolbarRight}
+                    </div>
+                )}
+
+            </div>
+
+
+            {/* ============================================================ */}
+            {/* TABLE */}
+            {/* ============================================================ */}
+
+            <div
+                className="
+                    overflow-hidden
+                    rounded-xl
+                    border
+                    bg-white
+                "
+            >
+
+                <Table>
+
+                    {/* ==================================================== */}
+                    {/* HEADER */}
+                    {/* ==================================================== */}
+
+                    <TableHeader>
+
+                        {table
+                            .getHeaderGroups()
+                            .map((headerGroup) => (
+
+                                <TableRow
+                                    key={headerGroup.id}
+                                >
+
+                                    {/* S.N. */}
+
+                                    <TableHead
+                                        className="
+                                            w-16
+                                            bg-gray-100
+                                            text-center
+                                            font-semibold
+                                        "
+                                    >
+                                        S.N.
+                                    </TableHead>
+
+
+                                    {/* Columns */}
+
+                                    {headerGroup.headers.map(
+                                        (header) => {
+
+                                            const canSort =
+                                                header.column.getCanSort();
+
+                                            return (
+                                                <TableHead
+                                                    key={header.id}
+                                                    onClick={
+                                                        canSort
+                                                            ? header.column.getToggleSortingHandler()
+                                                            : undefined
+                                                    }
+                                                    className={`
+                                                        bg-gray-100
+                                                        font-semibold
+                                                        ${
+                                                            canSort
+                                                                ? "cursor-pointer select-none"
+                                                                : ""
+                                                        }
+                                                    `}
+                                                >
+
+                                                    <div className="flex items-center gap-2">
+
+                                                        {header.isPlaceholder
+                                                            ? null
+                                                            : flexRender(
+                                                                  header
+                                                                      .column
+                                                                      .columnDef
+                                                                      .header,
+                                                                  header.getContext()
+                                                              )}
+
+                                                        {header.column.getIsSorted() ===
+                                                            "asc" && (
+                                                            <span>
+                                                                ↑
+                                                            </span>
+                                                        )}
+
+                                                        {header.column.getIsSorted() ===
+                                                            "desc" && (
+                                                            <span>
+                                                                ↓
+                                                            </span>
+                                                        )}
+
+                                                    </div>
+
+                                                </TableHead>
+                                            );
+                                        }
+                                    )}
+
+                                </TableRow>
+
+                            ))}
+
+                    </TableHeader>
+
+
+                    {/* ==================================================== */}
+                    {/* BODY */}
+                    {/* ==================================================== */}
+
+                    <TableBody>
+
+                        {isLoading ? (
+
+                            <TableRow>
+
+                                <TableCell
+                                    colSpan={
+                                        columns.length + 1
+                                    }
+                                    className="
+                                        py-10
+                                        text-center
+                                        text-gray-500
+                                    "
+                                >
+                                    Loading invoices...
+                                </TableCell>
+
+                            </TableRow>
+
+                        ) : table.getRowModel().rows.length ===
+                          0 ? (
+
+                            <TableRow>
+
+                                <TableCell
+                                    colSpan={
+                                        columns.length + 1
+                                    }
+                                    className="
+                                        py-10
+                                        text-center
+                                        text-gray-500
+                                    "
+                                >
+                                    No invoices found.
+                                </TableCell>
+
+                            </TableRow>
+
+                        ) : (
+
+                            table
+                                .getRowModel()
+                                .rows
+                                .map((row, index) => {
+
+                                    const serialNumber =
+                                        table.getState()
+                                            .pagination
+                                            .pageIndex *
+                                            table.getState()
+                                                .pagination
+                                                .pageSize +
+                                        index +
+                                        1;
+
+                                    return (
+
+                                        <TableRow
+                                            key={row.id}
+                                        >
+
+                                            {/* S.N. */}
+
+                                            <TableCell
+                                                className="
+                                                    w-16
+                                                    text-center
+                                                    font-medium
+                                                    text-gray-600
+                                                "
+                                            >
+                                                {serialNumber}
+                                            </TableCell>
+
+
+                                            {/* Cells */}
+
+                                            {row
+                                                .getVisibleCells()
+                                                .map((cell) => (
+
+                                                    <TableCell
+                                                        key={cell.id}
+                                                        className="
+                                                            text-sm
+                                                            text-gray-700
+                                                        "
+                                                    >
+                                                        {flexRender(
+                                                            cell
+                                                                .column
+                                                                .columnDef
+                                                                .cell,
+                                                            cell.getContext()
+                                                        )}
+                                                    </TableCell>
+
+                                                ))}
+
+                                        </TableRow>
+
+                                    );
+                                })
+
+                        )}
+
+                    </TableBody>
+
+                </Table>
+
+            </div>
+
+
+            {/* ============================================================ */}
+            {/* PAGINATION */}
+            {/* ============================================================ */}
+
+            <div
+                className="
+                    flex
+                    flex-col
+                    gap-4
+                    md:flex-row
+                    md:items-center
+                    md:justify-between
+                "
+            >
+
+                {/* Showing */}
+
+                <div className="text-sm text-gray-600">
+
+                    Showing{" "}
+
+                    <strong>
+                        {
+                            table.getRowModel()
+                                .rows.length
+                        }
+                    </strong>
+
+                    {" "}of{" "}
+
+                    <strong>
+                        {
+                            table.getFilteredRowModel()
+                                .rows.length
+                        }
+                    </strong>
+
+                    {" "}invoices
+
+                </div>
+
+
+                {/* Pagination */}
+
+                <div className="flex items-center gap-2">
+
+                    <button
+                        type="button"
+                        disabled={
+                            !table.getCanPreviousPage()
+                        }
+                        onClick={() =>
+                            table.previousPage()
+                        }
+                        className="
+                            rounded
+                            border
+                            bg-blue-600
+                            px-4
+                            py-2
+                            text-sm
+                            text-white
+                            transition
+                            hover:bg-blue-700
+                            disabled:cursor-not-allowed
+                            disabled:opacity-50
+                        "
+                    >
+                        Previous
+                    </button>
+
+
+                    <span
+                        className="
+                            whitespace-nowrap
+                            px-3
+                            py-2
+                            text-sm
+                            text-gray-600
+                        "
+                    >
+                        Page{" "}
+
+                        {
+                            table.getState()
+                                .pagination
+                                .pageIndex + 1
+                        }
+
+                        {" "}of{" "}
+
+                        {Math.max(
+                            table.getPageCount(),
+                            1
+                        )}
+
+                    </span>
+
+
+                    <button
+                        type="button"
+                        disabled={
+                            !table.getCanNextPage()
+                        }
+                        onClick={() =>
+                            table.nextPage()
+                        }
+                        className="
+                            cursor-pointer
+                            rounded
+                            border
+                            bg-blue-600
+                            px-4
+                            py-2
+                            text-sm
+                            text-white
+                            transition
+                            hover:bg-blue-700
+                            disabled:cursor-not-allowed
+                            disabled:opacity-50
+                        "
+                    >
+                        Next
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+    );
 };
+
+export default InvoiceTable;

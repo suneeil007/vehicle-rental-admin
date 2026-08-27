@@ -1,14 +1,83 @@
 import { useQuery } from "@tanstack/react-query";
-import { getVehicles } from "../api/vehicleApi";
+
+import {
+    getVehicles,
+    getAvailableVehicles,
+} from "../api/vehicleApi";
+
 import { vehicleKeys } from "../api/vehicleKeys";
 
-const useVehicles = () => {
+/*
+|--------------------------------------------------------------------------
+| Normalize Vehicle API Response
+|--------------------------------------------------------------------------
+|
+| Supports:
+|
+| response.data.data
+| response.data
+| response
+| response.data.vehicles
+| response.vehicles
+|
+*/
+
+const normalizeVehicleResponse = (response) => {
+
+    if (Array.isArray(response?.data?.data)) {
+        return response.data.data;
+    }
+
+    if (Array.isArray(response?.data)) {
+        return response.data;
+    }
+
+    if (Array.isArray(response)) {
+        return response;
+    }
+
+    if (Array.isArray(response?.data?.vehicles)) {
+        return response.data.vehicles;
+    }
+
+    if (Array.isArray(response?.vehicles)) {
+        return response.vehicles;
+    }
+
+    return [];
+};
+
+
+/*
+|--------------------------------------------------------------------------
+| useVehicles
+|--------------------------------------------------------------------------
+*/
+
+const useVehicles = ({
+    availableOnly = false,
+} = {}) => {
+
     return useQuery({
-        queryKey: vehicleKeys.all,
+
+        queryKey: [
+            ...vehicleKeys.all,
+            availableOnly
+                ? "available"
+                : "all",
+        ],
+
         queryFn: async () => {
-            const response = await getVehicles();
-            return response.data.data;
+
+            const response = availableOnly
+                ? await getAvailableVehicles()
+                : await getVehicles();
+
+            return normalizeVehicleResponse(
+                response
+            );
         },
+
     });
 };
 

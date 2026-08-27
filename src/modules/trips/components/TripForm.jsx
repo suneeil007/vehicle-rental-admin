@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
@@ -36,6 +36,7 @@ import { tripSchema } from "../validation/tripSchema";
 import useUsers from "../../users/hooks/useUsers";
 import useVehicles from "../../vehicles/hooks/useVehicles";
 import useBranches from "../../branches/hooks/useBranches";
+
 import { createUser } from "@/modules/users/api/userApi";
 
 
@@ -84,6 +85,152 @@ const FUEL_LEVEL_OPTIONS = [
 
 
 /* =========================================================
+   VEHICLE STATUS
+========================================================= */
+
+const VEHICLE_STATUS = {
+    AVAILABLE: "available",
+    BOOKED: "booked",
+    ON_TRIP: "on_trip",
+    MAINTENANCE: "maintenance",
+    INACTIVE: "inactive",
+};
+
+
+/* =========================================================
+   NORMALIZE VEHICLE STATUS
+========================================================= */
+
+const normalizeVehicleStatus = (value) => {
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+        return "";
+    }
+
+    if (typeof value === "object") {
+        value =
+            value.value ??
+            value.status ??
+            value.name ??
+            value.label ??
+            value.slug ??
+            "";
+    }
+
+    return String(value)
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, "_");
+};
+
+
+/* =========================================================
+   VEHICLE STATUS LABEL
+========================================================= */
+
+const getVehicleStatusLabel = (status) => {
+    const normalizedStatus =
+        normalizeVehicleStatus(status);
+
+    switch (normalizedStatus) {
+        case VEHICLE_STATUS.AVAILABLE:
+            return "Available";
+
+        case VEHICLE_STATUS.BOOKED:
+            return "Booked";
+
+        case VEHICLE_STATUS.ON_TRIP:
+            return "On Trip";
+
+        case VEHICLE_STATUS.MAINTENANCE:
+            return "Maintenance";
+
+        case VEHICLE_STATUS.INACTIVE:
+            return "Inactive";
+
+        default:
+            return normalizedStatus
+                ? normalizedStatus
+                    .replace(/_/g, " ")
+                    .replace(/\b\w/g, (char) =>
+                        char.toUpperCase()
+                    )
+                : "Unknown";
+    }
+};
+
+
+/* =========================================================
+   VEHICLE STATUS SORT ORDER
+
+   Available
+   Booked
+   On Trip
+   Maintenance
+   Inactive
+   Unknown
+========================================================= */
+
+const getVehicleStatusOrder = (status) => {
+    const normalizedStatus =
+        normalizeVehicleStatus(status);
+
+    switch (normalizedStatus) {
+        case VEHICLE_STATUS.AVAILABLE:
+            return 1;
+
+        case VEHICLE_STATUS.BOOKED:
+            return 2;
+
+        case VEHICLE_STATUS.ON_TRIP:
+            return 3;
+
+        case VEHICLE_STATUS.MAINTENANCE:
+            return 4;
+
+        case VEHICLE_STATUS.INACTIVE:
+            return 5;
+
+        default:
+            return 6;
+    }
+};
+
+
+/* =========================================================
+   VEHICLE STATUS TEXT CLASS
+========================================================= */
+
+const getVehicleStatusClass = (status) => {
+    const normalizedStatus =
+        normalizeVehicleStatus(status);
+
+    switch (normalizedStatus) {
+        case VEHICLE_STATUS.AVAILABLE:
+            return "text-green-600";
+
+        case VEHICLE_STATUS.BOOKED:
+            return "text-yellow-600";
+
+        case VEHICLE_STATUS.ON_TRIP:
+            return "text-red-600";
+
+        case VEHICLE_STATUS.MAINTENANCE:
+            return "text-orange-600";
+
+        case VEHICLE_STATUS.INACTIVE:
+            return "text-gray-500";
+
+        default:
+            return "text-gray-500";
+    }
+};
+
+
+/* =========================================================
    FORMAT DATETIME FOR datetime-local
 ========================================================= */
 
@@ -99,10 +246,22 @@ const formatDateTimeLocal = (value) => {
     }
 
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
+
+    const month = String(
+        date.getMonth() + 1
+    ).padStart(2, "0");
+
+    const day = String(
+        date.getDate()
+    ).padStart(2, "0");
+
+    const hours = String(
+        date.getHours()
+    ).padStart(2, "0");
+
+    const minutes = String(
+        date.getMinutes()
+    ).padStart(2, "0");
 
     return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
@@ -283,6 +442,47 @@ const normalizeFuelLevel = (value) => {
 
 
 /* =========================================================
+   GET BOOKING VEHICLE ID
+========================================================= */
+
+const getBookingVehicleId = (values) => {
+    if (!values) {
+        return "";
+    }
+
+    const booking = values.booking;
+
+    const vehicleId =
+        booking?.vehicle_id ??
+        booking?.vehicle?.id ??
+        booking?.vehicle?.vehicle_id ??
+        values.vehicle_id ??
+        values.vehicle?.id ??
+        values.vehicle?.vehicle_id ??
+        "";
+
+    return normalizeId(vehicleId);
+};
+
+
+/* =========================================================
+   GET BOOKING VEHICLE OBJECT
+========================================================= */
+
+const getBookingVehicle = (values) => {
+    if (!values) {
+        return null;
+    }
+
+    return (
+        values.booking?.vehicle ??
+        values.vehicle ??
+        null
+    );
+};
+
+
+/* =========================================================
    TRIP FORM
 ========================================================= */
 
@@ -292,7 +492,6 @@ const TripForm = ({
     isLoading = false,
     defaultValues = null,
 }) => {
-
     const queryClient = useQueryClient();
 
 
@@ -303,6 +502,7 @@ const TripForm = ({
     const { data: users } = useUsers();
     const { data: vehicles } = useVehicles();
     const { data: branches } = useBranches();
+
 
     const allUsers = Array.isArray(users)
         ? users
@@ -316,6 +516,10 @@ const TripForm = ({
         ? branches
         : [];
 
+
+    /* =====================================================
+       USER ROLES
+    ===================================================== */
 
     const getRoleId = (user) => {
         return Number(
@@ -335,47 +539,265 @@ const TripForm = ({
         (user) => getRoleId(user) === 6
     );
 
-// console.log("TOTAL allUsers LENGTH:", allUsers.length);
-// console.log("ALL DRIVER-ROLE USERS:", allUsers.filter(u => getRoleId(u) === 6));
-
 
     /* =====================================================
        CUSTOMER SEARCH
     ===================================================== */
 
-    const [customerSearch, setCustomerSearch] = useState("");
-    const [creatingCustomer, setCreatingCustomer] = useState(false);
+    const [
+        customerSearch,
+        setCustomerSearch,
+    ] = useState("");
 
-     /* =====================================================
-       ENSURE CURRENTLY ASSIGNED CUSTOMER/DRIVER ARE ALWAYS
-       IN THE LIST, EVEN IF THE ROLE FILTER MISSES THEM
+    const [
+        creatingCustomer,
+        setCreatingCustomer,
+    ] = useState(false);
+
+
+    /* =====================================================
+       BOOKING VEHICLE ID
     ===================================================== */
 
-    const customersWithFallback = (() => {
-        const currentCustomer = defaultValues?.customer;
+    const bookingVehicleId =
+        getBookingVehicleId(defaultValues);
+
+
+    /* =====================================================
+       CURRENT TRIP VEHICLE ID
+    ===================================================== */
+
+    const currentVehicleId = normalizeId(
+        defaultValues?.vehicle_id ??
+        defaultValues?.vehicle?.id ??
+        defaultValues?.vehicle?.vehicle_id
+    );
+
+
+    /* =====================================================
+       VEHICLE THAT MUST BE INCLUDED
+    ===================================================== */
+
+    const requiredVehicleId =
+        bookingVehicleId ||
+        currentVehicleId;
+
+
+    /* =====================================================
+       BOOKING VEHICLE OBJECT
+    ===================================================== */
+
+    const bookingVehicle =
+        getBookingVehicle(defaultValues);
+
+
+    /* =====================================================
+       ALL VEHICLES FOR DROPDOWN
+
+       AVAILABLE VEHICLES ARE FIRST.
+
+       OTHER VEHICLES ARE SHOWN BELOW.
+
+       Only:
+         - available vehicles
+         - booking vehicle
+         - current trip vehicle
+
+       can be selected.
+
+       Other unavailable vehicles remain visible
+       but disabled.
+    ===================================================== */
+
+    const selectableVehicles = useMemo(() => {
+
+        let list = [...vehicleList];
+
+
+        /* =================================================
+           IF REQUIRED VEHICLE IS NOT IN API LIST,
+           ADD THE VEHICLE FROM BOOKING/TRIP RESPONSE.
+        ================================================= */
+
+        const requiredVehicleExists =
+            requiredVehicleId &&
+            list.some(
+                (vehicle) =>
+                    normalizeId(vehicle?.id) ===
+                    requiredVehicleId
+            );
+
+
+        if (
+            requiredVehicleId &&
+            !requiredVehicleExists &&
+            bookingVehicle &&
+            normalizeId(
+                bookingVehicle?.id ??
+                bookingVehicle?.vehicle_id
+            ) === requiredVehicleId
+        ) {
+
+            list.push({
+                ...bookingVehicle,
+
+                id:
+                    bookingVehicle.id ??
+                    bookingVehicle.vehicle_id,
+            });
+
+        }
+
+
+        /* =================================================
+           REMOVE DUPLICATE VEHICLES
+        ================================================= */
+
+        const uniqueVehicles = [];
+
+        const seenIds = new Set();
+
+        list.forEach((vehicle) => {
+
+            const id =
+                normalizeId(vehicle?.id);
+
+            if (!id) {
+                return;
+            }
+
+            if (seenIds.has(id)) {
+                return;
+            }
+
+            seenIds.add(id);
+
+            uniqueVehicles.push(vehicle);
+
+        });
+
+
+        /* =================================================
+           SORT VEHICLES
+
+           Available first.
+           Then Booked.
+           Then On Trip.
+           Then Maintenance.
+           Then Inactive.
+        ================================================= */
+
+        uniqueVehicles.sort((a, b) => {
+
+            const statusA =
+                getVehicleStatusOrder(
+                    a?.status
+                );
+
+            const statusB =
+                getVehicleStatusOrder(
+                    b?.status
+                );
+
+
+            if (statusA !== statusB) {
+                return statusA - statusB;
+            }
+
+
+            const nameA =
+                String(
+                    a?.name ?? ""
+                ).toLowerCase();
+
+            const nameB =
+                String(
+                    b?.name ?? ""
+                ).toLowerCase();
+
+
+            return nameA.localeCompare(
+                nameB
+            );
+
+        });
+
+
+        return uniqueVehicles;
+
+    }, [
+        vehicleList,
+        requiredVehicleId,
+        bookingVehicle,
+    ]);
+
+
+    /* =====================================================
+       CURRENT CUSTOMER FALLBACK
+    ===================================================== */
+
+    const customersWithFallback = useMemo(() => {
+
+        const currentCustomer =
+            defaultValues?.customer;
+
+
         if (
             currentCustomer?.id &&
             !customers.some(
-                (c) => normalizeId(c.id) === normalizeId(currentCustomer.id)
+                (customer) =>
+                    normalizeId(customer.id) ===
+                    normalizeId(currentCustomer.id)
             )
         ) {
-            return [currentCustomer, ...customers];
-        }
-        return customers;
-    })();
 
-    const driversWithFallback = (() => {
-        const currentDriver = defaultValues?.driver;
+            return [
+                currentCustomer,
+                ...customers,
+            ];
+
+        }
+
+        return customers;
+
+    }, [
+        customers,
+        defaultValues,
+    ]);
+
+
+    /* =====================================================
+       CURRENT DRIVER FALLBACK
+    ===================================================== */
+
+    const driversWithFallback = useMemo(() => {
+
+        const currentDriver =
+            defaultValues?.driver;
+
+
         if (
             currentDriver?.id &&
             !drivers.some(
-                (d) => normalizeId(d.id) === normalizeId(currentDriver.id)
+                (driver) =>
+                    normalizeId(driver.id) ===
+                    normalizeId(currentDriver.id)
             )
         ) {
-            return [currentDriver, ...drivers];
+
+            return [
+                currentDriver,
+                ...drivers,
+            ];
+
         }
+
         return drivers;
-    })();
+
+    }, [
+        drivers,
+        defaultValues,
+    ]);
 
 
     /* =====================================================
@@ -394,7 +816,8 @@ const TripForm = ({
         },
     } = useForm({
 
-        resolver: zodResolver(tripSchema),
+        resolver:
+            zodResolver(tripSchema),
 
         defaultValues: {
 
@@ -426,7 +849,9 @@ const TripForm = ({
             fuel_charge: "0",
 
             pickup_notes: "",
+
         },
+
     });
 
 
@@ -434,17 +859,34 @@ const TripForm = ({
        WATCH VALUES
     ===================================================== */
 
-    const customerId = watch("customer_id");
-    const vehicleId = watch("vehicle_id");
-    const driverId = watch("driver_id");
+    const customerId =
+        watch("customer_id");
 
-    const rentalType = watch("rental_type");
+    const vehicleId =
+        watch("vehicle_id");
 
-    const pickupBranchId = watch("pickup_branch_id");
-    const dropBranchId = watch("drop_branch_id");
+    const driverId =
+        watch("driver_id");
 
-    const pickupFuel = watch("pickup_fuel");
-    const returnFuel = watch("return_fuel");
+    const rentalType =
+        watch("rental_type");
+
+    const pickupBranchId =
+        watch("pickup_branch_id");
+
+    const dropBranchId =
+        watch("drop_branch_id");
+
+    const pickupFuel =
+        watch("pickup_fuel");
+
+    const returnFuel =
+        watch("return_fuel");
+
+
+    /* =====================================================
+       BILLING WATCH
+    ===================================================== */
 
     const baseAmount = Number(
         watch("base_amount") || 0
@@ -466,6 +908,7 @@ const TripForm = ({
         watch("fuel_charge") || 0
     );
 
+
     const totalAmount =
         baseAmount +
         extraKmCharge +
@@ -475,11 +918,7 @@ const TripForm = ({
 
 
     /* =====================================================
-       POPULATE EDIT DATA
-
-       IMPORTANT:
-       Customer and Driver are populated directly through
-       reset(), exactly like Rental Type and Fuel.
+       POPULATE EDIT / BOOKING DATA
     ===================================================== */
 
     useEffect(() => {
@@ -493,7 +932,8 @@ const TripForm = ({
            CUSTOMER ID
         ================================================= */
 
-       const normalizedCustomerId = normalizeId(
+        const normalizedCustomerId =
+            normalizeId(
                 defaultValues.customer_id ??
                 defaultValues.customer?.id ??
                 defaultValues.customer?.user_id ??
@@ -501,36 +941,39 @@ const TripForm = ({
             );
 
 
-
         /* =================================================
            DRIVER ID
         ================================================= */
 
-        const normalizedDriverId = normalizeId(
-            defaultValues.driver_id ??
-            defaultValues.driver?.id ??
-            defaultValues.driver?.user_id ??
-            defaultValues.driver?.driver_id
-        );
+        const normalizedDriverId =
+            normalizeId(
+                defaultValues.driver_id ??
+                defaultValues.driver?.id ??
+                defaultValues.driver?.user_id ??
+                defaultValues.driver?.driver_id
+            );
 
 
         /* =================================================
            VEHICLE ID
+
+           BOOKING VEHICLE HAS PRIORITY.
         ================================================= */
 
-        const normalizedVehicleId = normalizeId(
-            defaultValues.vehicle_id ??
-            defaultValues.vehicle?.id
-        );
+        const normalizedVehicleId =
+            getBookingVehicleId(
+                defaultValues
+            );
 
 
         /* =================================================
            RENTAL TYPE
         ================================================= */
 
-        const normalizedRentalType = normalizeRentalType(
-            defaultValues.rental_type
-        );
+        const normalizedRentalType =
+            normalizeRentalType(
+                defaultValues.rental_type
+            );
 
 
         /* =================================================
@@ -544,6 +987,7 @@ const TripForm = ({
                 defaultValues.pickup_fuel_level
             );
 
+
         const normalizedReturnFuel =
             normalizeFuelLevel(
                 defaultValues.return_fuel ??
@@ -552,110 +996,119 @@ const TripForm = ({
             );
 
 
-        // console.log(
-        //     "TRIP EDIT CUSTOMER:",
-        //     defaultValues.customer_id,
-        //     defaultValues.customer,
-        //     "=>",
-        //     normalizedCustomerId
-        // );
-
-        // console.log(
-        //     "TRIP EDIT DRIVER:",
-        //     defaultValues.driver_id,
-        //     defaultValues.driver,
-        //     "=>",
-        //     normalizedDriverId
-        // );
-
-        // console.log(
-        //     "TRIP EDIT RENTAL TYPE:",
-        //     defaultValues.rental_type,
-        //     "=>",
-        //     normalizedRentalType
-        // );
-
-        // console.log(
-        //     "TRIP EDIT PICKUP FUEL:",
-        //     defaultValues.pickup_fuel,
-        //     "=>",
-        //     normalizedPickupFuel
-        // );
-
+        /* =================================================
+           FORM VALUES
+        ================================================= */
 
         const values = {
 
             /* ================= CUSTOMER ================= */
 
-            customer_id: normalizedCustomerId,
-            customer: defaultValues.customer,   
+            customer_id:
+                normalizedCustomerId,
+
+            customer:
+                defaultValues.customer,
 
 
             /* ================= VEHICLE ================= */
 
-            vehicle_id: normalizedVehicleId,
-            vehicle: defaultValues.vehicle,   
+            vehicle_id:
+                normalizedVehicleId,
+
+            vehicle:
+                defaultValues.vehicle ??
+                defaultValues.booking?.vehicle,
+
+
+            /* ================= BOOKING ================= */
+
+            booking:
+                defaultValues.booking,
 
 
             /* ================= RENTAL TYPE ================= */
 
-            rental_type: normalizedRentalType,
+            rental_type:
+                normalizedRentalType,
 
 
             /* ================= DRIVER ================= */
 
-            driver_id: normalizedDriverId,
-            driver: defaultValues.driver, 
+            driver_id:
+                normalizedDriverId,
+
+            driver:
+                defaultValues.driver,
 
 
             /* ================= BRANCH ================= */
 
-            pickup_branch_id: normalizeId(
-                defaultValues.pickup_branch_id ??
-                defaultValues.pickup_branch?.id
-            ),
+            pickup_branch_id:
+                normalizeId(
+                    defaultValues.pickup_branch_id ??
+                    defaultValues.pickup_branch?.id
+                ),
 
-            drop_branch_id: normalizeId(
-                defaultValues.drop_branch_id ??
-                defaultValues.drop_branch?.id
-            ),
+            drop_branch_id:
+                normalizeId(
+                    defaultValues.drop_branch_id ??
+                    defaultValues.drop_branch?.id
+                ),
 
 
             /* ================= LOCATIONS ================= */
 
             pickup_location:
-                defaultValues.pickup_location ?? "",
+                defaultValues.pickup_location ??
+                "",
 
             drop_location:
-                defaultValues.drop_location ?? "",
+                defaultValues.drop_location ??
+                "",
 
 
             /* ================= DATES ================= */
 
             pickup_at:
                 formatDateTimeLocal(
-                    defaultValues.pickup_at
+                    defaultValues.pickup_at ??
+                    defaultValues.booking?.pickup_at ??
+                    defaultValues.booking?.start_at
                 ),
 
             expected_return_at:
                 formatDateTimeLocal(
-                    defaultValues.expected_return_at
+                    defaultValues.expected_return_at ??
+                    defaultValues.booking?.expected_return_at ??
+                    defaultValues.booking?.return_at ??
+                    defaultValues.booking?.end_at
                 ),
 
 
             /* ================= VEHICLE CONDITION ================= */
 
             pickup_odometer:
-                defaultValues.pickup_odometer !== null &&
-                defaultValues.pickup_odometer !== undefined
-                    ? String(defaultValues.pickup_odometer)
+                defaultValues.pickup_odometer !==
+                    null &&
+                defaultValues.pickup_odometer !==
+                    undefined
+                    ? String(
+                        defaultValues.pickup_odometer
+                    )
                     : "0",
 
+
             return_odometer:
-                defaultValues.return_odometer !== null &&
-                defaultValues.return_odometer !== undefined
-                    ? String(defaultValues.return_odometer)
+                defaultValues.return_odometer !==
+                    null &&
+                defaultValues.return_odometer !==
+                    undefined
+                    ? String(
+                        defaultValues.return_odometer
+                    )
                     : "",
+
 
             pickup_fuel:
                 normalizedPickupFuel,
@@ -667,47 +1120,67 @@ const TripForm = ({
             /* ================= BILLING ================= */
 
             base_amount:
-                defaultValues.base_amount !== null &&
-                defaultValues.base_amount !== undefined
-                    ? String(defaultValues.base_amount)
+                defaultValues.base_amount !==
+                    null &&
+                defaultValues.base_amount !==
+                    undefined
+                    ? String(
+                        defaultValues.base_amount
+                    )
                     : "",
 
+
             extra_km_charge:
-                defaultValues.extra_km_charge !== null &&
-                defaultValues.extra_km_charge !== undefined
-                    ? String(defaultValues.extra_km_charge)
+                defaultValues.extra_km_charge !==
+                    null &&
+                defaultValues.extra_km_charge !==
+                    undefined
+                    ? String(
+                        defaultValues.extra_km_charge
+                    )
                     : "0",
+
 
             late_return_charge:
-                defaultValues.late_return_charge !== null &&
-                defaultValues.late_return_charge !== undefined
-                    ? String(defaultValues.late_return_charge)
+                defaultValues.late_return_charge !==
+                    null &&
+                defaultValues.late_return_charge !==
+                    undefined
+                    ? String(
+                        defaultValues.late_return_charge
+                    )
                     : "0",
+
 
             damage_charge:
-                defaultValues.damage_charge !== null &&
-                defaultValues.damage_charge !== undefined
-                    ? String(defaultValues.damage_charge)
+                defaultValues.damage_charge !==
+                    null &&
+                defaultValues.damage_charge !==
+                    undefined
+                    ? String(
+                        defaultValues.damage_charge
+                    )
                     : "0",
 
+
             fuel_charge:
-                defaultValues.fuel_charge !== null &&
-                defaultValues.fuel_charge !== undefined
-                    ? String(defaultValues.fuel_charge)
+                defaultValues.fuel_charge !==
+                    null &&
+                defaultValues.fuel_charge !==
+                    undefined
+                    ? String(
+                        defaultValues.fuel_charge
+                    )
                     : "0",
 
 
             /* ================= NOTES ================= */
 
             pickup_notes:
-                defaultValues.pickup_notes ?? "",
+                defaultValues.pickup_notes ??
+                "",
+
         };
-
-
-        // console.log(
-        //     "TRIP EDIT FORM VALUES:",
-        //     values
-        // );
 
 
         reset(values);
@@ -747,6 +1220,7 @@ const TripForm = ({
                 }
             );
 
+
             setValue(
                 "pickup_location",
                 "",
@@ -756,6 +1230,7 @@ const TripForm = ({
                 }
             );
 
+
             setValue(
                 "drop_location",
                 "",
@@ -764,6 +1239,7 @@ const TripForm = ({
                     shouldDirty: true,
                 }
             );
+
         }
 
 
@@ -778,6 +1254,7 @@ const TripForm = ({
                 }
             );
 
+
             setValue(
                 "drop_branch_id",
                 "",
@@ -786,7 +1263,9 @@ const TripForm = ({
                     shouldDirty: true,
                 }
             );
+
         }
+
     };
 
 
@@ -799,13 +1278,16 @@ const TripForm = ({
         const name =
             customerSearch.trim();
 
+
         if (!name) {
             return;
         }
 
+
         try {
 
             setCreatingCustomer(true);
+
 
             const firstFourLetters =
                 name
@@ -813,8 +1295,10 @@ const TripForm = ({
                     .slice(0, 4)
                     .toLowerCase();
 
+
             const password =
                 `${firstFourLetters}@2026`;
+
 
             const response =
                 await createUser({
@@ -836,6 +1320,7 @@ const TripForm = ({
                         password,
 
                     status: "active",
+
                 });
 
 
@@ -853,6 +1338,7 @@ const TripForm = ({
                 );
 
                 return;
+
             }
 
 
@@ -883,7 +1369,9 @@ const TripForm = ({
         } finally {
 
             setCreatingCustomer(false);
+
         }
+
     };
 
 
@@ -894,7 +1382,8 @@ const TripForm = ({
     const submitForm = (data) => {
 
         const isSelfDrive =
-            data.rental_type === "self_drive";
+            data.rental_type ===
+            "self_drive";
 
 
         const payload = {
@@ -906,31 +1395,44 @@ const TripForm = ({
 
             customer_id:
                 data.customer_id
-                    ? Number(data.customer_id)
+                    ? Number(
+                        data.customer_id
+                    )
                     : null,
+
 
             vehicle_id:
                 data.vehicle_id
-                    ? Number(data.vehicle_id)
+                    ? Number(
+                        data.vehicle_id
+                    )
                     : null,
+
 
             driver_id:
                 !isSelfDrive &&
                 data.driver_id
-                    ? Number(data.driver_id)
+                    ? Number(
+                        data.driver_id
+                    )
                     : null,
 
 
             pickup_branch_id:
                 isSelfDrive &&
                 data.pickup_branch_id
-                    ? Number(data.pickup_branch_id)
+                    ? Number(
+                        data.pickup_branch_id
+                    )
                     : null,
+
 
             drop_branch_id:
                 isSelfDrive &&
                 data.drop_branch_id
-                    ? Number(data.drop_branch_id)
+                    ? Number(
+                        data.drop_branch_id
+                    )
                     : null,
 
 
@@ -939,24 +1441,32 @@ const TripForm = ({
             pickup_location:
                 isSelfDrive
                     ? null
-                    : data.pickup_location?.trim() || null,
+                    : data.pickup_location
+                        ?.trim() || null,
+
 
             drop_location:
                 isSelfDrive
                     ? null
-                    : data.drop_location?.trim() || null,
+                    : data.drop_location
+                        ?.trim() || null,
 
 
             /* ================= VEHICLE CONDITION ================= */
 
             pickup_odometer:
-                Number(data.pickup_odometer),
+                Number(
+                    data.pickup_odometer
+                ),
+
 
             return_odometer:
                 data.return_odometer !== "" &&
                 data.return_odometer !== null &&
                 data.return_odometer !== undefined
-                    ? Number(data.return_odometer)
+                    ? Number(
+                        data.return_odometer
+                    )
                     : null,
 
 
@@ -964,6 +1474,7 @@ const TripForm = ({
                 normalizeFuelLevel(
                     data.pickup_fuel
                 ) || null,
+
 
             return_fuel:
                 normalizeFuelLevel(
@@ -974,27 +1485,34 @@ const TripForm = ({
             /* ================= BILLING ================= */
 
             base_amount:
-                Number(data.base_amount),
+                Number(
+                    data.base_amount
+                ),
+
 
             extra_km_charge:
                 Number(
                     data.extra_km_charge || 0
                 ),
 
+
             late_return_charge:
                 Number(
                     data.late_return_charge || 0
                 ),
+
 
             damage_charge:
                 Number(
                     data.damage_charge || 0
                 ),
 
+
             fuel_charge:
                 Number(
                     data.fuel_charge || 0
                 ),
+
         };
 
 
@@ -1005,6 +1523,7 @@ const TripForm = ({
 
 
         onSubmit(payload);
+
     };
 
 
@@ -1015,9 +1534,14 @@ const TripForm = ({
     return (
 
         <form
-            onSubmit={handleSubmit(submitForm)}
+            onSubmit={
+                handleSubmit(
+                    submitForm
+                )
+            }
             className="
                 bg-white
+                border
                 border-gray-200
                 rounded-xl
                 shadow-sm
@@ -1026,7 +1550,14 @@ const TripForm = ({
             "
         >
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div
+                className="
+                    grid
+                    grid-cols-1
+                    md:grid-cols-3
+                    gap-5
+                "
+            >
 
 
                 {/* =================================================
@@ -1113,7 +1644,9 @@ const TripForm = ({
 
                                 <CommandInput
                                     placeholder="Search customer..."
-                                    value={customerSearch}
+                                    value={
+                                        customerSearch
+                                    }
                                     onValueChange={
                                         setCustomerSearch
                                     }
@@ -1134,14 +1667,21 @@ const TripForm = ({
                                                     )
                                         ) && (
 
-                                            <div className="p-2 border-b">
+                                            <div
+                                                className="
+                                                    p-2
+                                                    border-b
+                                                "
+                                            >
 
-                                                <div className="
-                                                    px-2
-                                                    py-2
-                                                    text-sm
-                                                    text-gray-500
-                                                ">
+                                                <div
+                                                    className="
+                                                        px-2
+                                                        py-2
+                                                        text-sm
+                                                        text-gray-500
+                                                    "
+                                                >
                                                     No customer found.
                                                 </div>
 
@@ -1174,6 +1714,7 @@ const TripForm = ({
                                                         ＋
                                                     </span>
 
+
                                                     <span>
 
                                                         {creatingCustomer
@@ -1185,6 +1726,7 @@ const TripForm = ({
                                                 </button>
 
                                             </div>
+
                                         )}
 
 
@@ -1194,14 +1736,20 @@ const TripForm = ({
                                             (customer) => (
 
                                                 <CommandItem
-                                                    key={customer.id}
-                                                    value={`${customer.name} ${customer.email || ""}`}
+                                                    key={
+                                                        customer.id
+                                                    }
+                                                    value={`
+                                                        ${customer.name}
+                                                        ${customer.email || ""}
+                                                    `}
                                                     onSelect={() => {
 
                                                         const selectedCustomerId =
                                                             normalizeId(
                                                                 customer.id
                                                             );
+
 
                                                         setValue(
                                                             "customer_id",
@@ -1214,9 +1762,11 @@ const TripForm = ({
                                                             }
                                                         );
 
+
                                                         setCustomerSearch(
                                                             ""
                                                         );
+
                                                     }}
                                                 >
 
@@ -1237,6 +1787,7 @@ const TripForm = ({
                                                             }
                                                         `}
                                                     />
+
 
                                                     <span className="truncate">
 
@@ -1304,7 +1855,7 @@ const TripForm = ({
 
                                     {vehicleId
                                         ? (
-                                            vehicleList.find(
+                                            selectableVehicles.find(
                                                 (vehicle) =>
                                                     normalizeId(
                                                         vehicle.id
@@ -1314,6 +1865,7 @@ const TripForm = ({
                                                     )
                                             )?.name ||
                                             defaultValues?.vehicle?.name ||
+                                            defaultValues?.booking?.vehicle?.name ||
                                             "Vehicle selected"
                                         )
                                         : "Select vehicle"}
@@ -1347,9 +1899,14 @@ const TripForm = ({
 
                             <Command>
 
+                                {/* =================================
+                                   SEARCH
+                                ================================= */}
+
                                 <CommandInput
                                     placeholder="Search vehicle..."
                                 />
+
 
                                 <CommandList>
 
@@ -1357,66 +1914,366 @@ const TripForm = ({
                                         No vehicle found.
                                     </CommandEmpty>
 
-                                    <CommandGroup>
 
-                                        {vehicleList.map(
-                                            (vehicle) => (
+                                    {/* =================================
+                                       AVAILABLE VEHICLES
+                                    ================================= */}
 
-                                                <CommandItem
-                                                    key={vehicle.id}
-                                                    value={`${vehicle.name} ${vehicle.registration_number || ""}`}
-                                                    onSelect={() => {
+                                    {selectableVehicles.some(
+                                        (vehicle) =>
+                                            normalizeVehicleStatus(
+                                                vehicle?.status
+                                            ) ===
+                                            VEHICLE_STATUS.AVAILABLE
+                                    ) && (
 
-                                                        setValue(
-                                                            "vehicle_id",
-                                                            String(
+                                        <CommandGroup
+                                            heading="Available Vehicles"
+                                        >
+
+                                            {selectableVehicles
+                                                .filter(
+                                                    (vehicle) =>
+                                                        normalizeVehicleStatus(
+                                                            vehicle?.status
+                                                        ) ===
+                                                        VEHICLE_STATUS.AVAILABLE
+                                                )
+                                                .map(
+                                                    (vehicle) => {
+
+                                                        const id =
+                                                            normalizeId(
                                                                 vehicle.id
-                                                            ),
-                                                            {
-                                                                shouldValidate:
-                                                                    true,
-                                                                shouldDirty:
-                                                                    true,
-                                                            }
+                                                            );
+
+
+                                                        const isSelected =
+                                                            normalizeId(
+                                                                vehicleId
+                                                            ) === id;
+
+
+                                                        return (
+
+                                                            <CommandItem
+                                                                key={id}
+                                                                value={`
+                                                                    ${vehicle.name || ""}
+                                                                    ${vehicle.registration_number || ""}
+                                                                    Available
+                                                                `}
+                                                                onSelect={() => {
+
+                                                                    setValue(
+                                                                        "vehicle_id",
+                                                                        id,
+                                                                        {
+                                                                            shouldValidate:
+                                                                                true,
+                                                                            shouldDirty:
+                                                                                true,
+                                                                        }
+                                                                    );
+
+                                                                }}
+                                                                className="
+                                                                    cursor-pointer
+                                                                    px-3
+                                                                    py-2.5
+                                                                "
+                                                            >
+
+                                                                {/* CHECK */}
+
+                                                                <Check
+                                                                    className={`
+                                                                        mr-2
+                                                                        h-4
+                                                                        w-4
+                                                                        shrink-0
+                                                                        ${
+                                                                            isSelected
+                                                                                ? "opacity-100"
+                                                                                : "opacity-0"
+                                                                        }
+                                                                    `}
+                                                                />
+
+
+                                                                {/* VEHICLE */}
+                                                                    <div
+                                                                        className="
+                                                                            min-w-0
+                                                                            flex-1
+                                                                            flex
+                                                                            items-center
+                                                                            gap-2
+                                                                        "
+                                                                    >
+                                                                        <div
+                                                                            className="
+                                                                                truncate
+                                                                                font-medium
+                                                                                text-gray-900
+                                                                            "
+                                                                        >
+                                                                            {vehicle.name}
+                                                                        </div>
+
+                                                                        {vehicle.registration_number && (
+                                                                            <>
+                                                                                <span className="shrink-0 text-gray-400">
+                                                                                    —
+                                                                                </span>
+
+                                                                                <div
+                                                                                    className="
+                                                                                        truncate
+                                                                                        text-sm
+                                                                                        text-[11px]
+                                                                                        text-gray-500
+                                                                                    "
+                                                                                >
+                                                                                    {vehicle.registration_number}
+                                                                                </div>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+
+
+                                                                
+
+                                                            </CommandItem>
+
                                                         );
 
-                                                    }}
-                                                >
+                                                    }
+                                                )}
 
-                                                    <Check
-                                                        className={`
-                                                            mr-2
-                                                            h-4
-                                                            w-4
-                                                            ${
-                                                                normalizeId(
-                                                                    vehicleId
-                                                                ) ===
-                                                                normalizeId(
-                                                                    vehicle.id
-                                                                )
-                                                                    ? "opacity-100"
-                                                                    : "opacity-0"
-                                                            }
-                                                        `}
-                                                    />
+                                        </CommandGroup>
 
-                                                    <span className="truncate">
+                                    )}
 
-                                                        {vehicle.name}
 
-                                                        {vehicle.registration_number
-                                                            ? ` — ${vehicle.registration_number}`
-                                                            : ""}
+                                    {/* =================================
+                                       OTHER VEHICLES
+                                    ================================= */}
 
-                                                    </span>
+                                    {selectableVehicles.some(
+                                        (vehicle) =>
+                                            normalizeVehicleStatus(
+                                                vehicle?.status
+                                            ) !==
+                                            VEHICLE_STATUS.AVAILABLE
+                                    ) && (
 
-                                                </CommandItem>
+                                        <CommandGroup
+                                            heading="Other Vehicles"
+                                        >
 
-                                            )
-                                        )}
+                                            {selectableVehicles
+                                                .filter(
+                                                    (vehicle) =>
+                                                        normalizeVehicleStatus(
+                                                            vehicle?.status
+                                                        ) !==
+                                                        VEHICLE_STATUS.AVAILABLE
+                                                )
+                                                .map(
+                                                    (vehicle) => {
 
-                                    </CommandGroup>
+                                                        const id =
+                                                            normalizeId(
+                                                                vehicle.id
+                                                            );
+
+
+                                                        const status =
+                                                            normalizeVehicleStatus(
+                                                                vehicle.status
+                                                            );
+
+
+                                                        /*
+                                                         * The booking vehicle
+                                                         * or current trip vehicle
+                                                         * remains selectable.
+                                                         */
+
+                                                        const isBookingVehicle =
+                                                            id ===
+                                                            requiredVehicleId;
+
+
+                                                        const isSelected =
+                                                            normalizeId(
+                                                                vehicleId
+                                                            ) === id;
+
+
+                                                        const canSelect =
+                                                            isBookingVehicle;
+
+
+                                                        return (
+
+                                                            <CommandItem
+                                                                key={id}
+                                                                value={`
+                                                                    ${vehicle.name || ""}
+                                                                    ${vehicle.registration_number || ""}
+                                                                    ${getVehicleStatusLabel(status)}
+                                                                `}
+                                                                disabled={
+                                                                    !canSelect
+                                                                }
+                                                                onSelect={() => {
+
+                                                                    if (!canSelect) {
+                                                                        return;
+                                                                    }
+
+
+                                                                    setValue(
+                                                                        "vehicle_id",
+                                                                        id,
+                                                                        {
+                                                                            shouldValidate:
+                                                                                true,
+                                                                            shouldDirty:
+                                                                                true,
+                                                                        }
+                                                                    );
+
+                                                                }}
+                                                                className={`
+                                                                    px-3
+                                                                    py-2.5
+                                                                    ${
+                                                                        canSelect
+                                                                            ? "cursor-pointer"
+                                                                            : "cursor-not-allowed opacity-60"
+                                                                    }
+                                                                `}
+                                                            >
+
+                                                                {/* CHECK */}
+
+                                                                <Check
+                                                                    className={`
+                                                                        mr-2
+                                                                        h-4
+                                                                        w-4
+                                                                        shrink-0
+                                                                        ${
+                                                                            isSelected
+                                                                                ? "opacity-100"
+                                                                                : "opacity-0"
+                                                                        }
+                                                                    `}
+                                                                />
+
+
+                                                                {/* VEHICLE DETAILS + STATUS */}
+
+                                                                <div
+                                                                    className="
+                                                                        min-w-0
+                                                                        flex-1
+                                                                        flex
+                                                                        items-center
+                                                                        gap-2
+                                                                    "
+                                                                >
+                                                                    {/* VEHICLE NAME */}
+
+                                                                    <div
+                                                                        className="
+                                                                            min-w-0
+                                                                            truncate
+                                                                            font-medium
+                                                                            text-gray-900
+                                                                        "
+                                                                    >
+                                                                        {vehicle.name}
+                                                                    </div>
+
+
+                                                                    {/* REGISTRATION NUMBER */}
+
+                                                                    {vehicle.registration_number && (
+                                                                        <>
+                                                                            <span
+                                                                                className="
+                                                                                    shrink-0
+                                                                                    text-[11px]
+                                                                                    text-gray-400
+                                                                                "
+                                                                            >
+                                                                                —
+                                                                            </span>
+
+                                                                            <div
+                                                                                className="
+                                                                                    min-w-0
+                                                                                    truncate
+                                                                                    text-[11px]
+                                                                                    text-gray-500
+                                                                                "
+                                                                            >
+                                                                                {vehicle.registration_number}
+                                                                            </div>
+                                                                        </>
+                                                                    )}
+
+
+                                                                    {/* STATUS */}
+
+                                                                    <div
+                                                                        className="
+                                                                            ml-auto
+                                                                            flex
+                                                                            shrink-0
+                                                                            items-center
+                                                                            gap-1
+                                                                        "
+                                                                    >
+                                                                        <span
+                                                                            className={`
+                                                                                text-[11px]
+                                                                                font-medium
+                                                                                ${getVehicleStatusClass(status)}
+                                                                            `}
+                                                                        >
+                                                                            {getVehicleStatusLabel(status)}
+                                                                        </span>
+
+
+                                                                        {isBookingVehicle && (
+                                                                            <span
+                                                                                className="
+                                                                                    text-[11px]
+                                                                                    font-medium
+                                                                                    text-blue-600
+                                                                                "
+                                                                            >
+                                                                                • Booking
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                            </CommandItem>
+
+                                                        );
+
+                                                    }
+                                                )}
+
+                                        </CommandGroup>
+
+                                    )}
 
                                 </CommandList>
 
@@ -1451,7 +2308,9 @@ const TripForm = ({
                             ${defaultValues?.id ?? "new"}-
                             ${rentalType}
                         `}
-                        value={rentalType || ""}
+                        value={
+                            rentalType || ""
+                        }
                         onValueChange={
                             handleRentalTypeChange
                         }
@@ -1479,8 +2338,12 @@ const TripForm = ({
                                 (option) => (
 
                                     <SelectItem
-                                        key={option.value}
-                                        value={option.value}
+                                        key={
+                                            option.value
+                                        }
+                                        value={
+                                            option.value
+                                        }
                                     >
                                         {option.label}
                                     </SelectItem>
@@ -1519,7 +2382,9 @@ const TripForm = ({
                                 ${defaultValues?.id ?? "new"}-
                                 ${driverId}
                             `}
-                            value={driverId || ""}
+                            value={
+                                driverId || ""
+                            }
                             onValueChange={(value) => {
 
                                 setValue(
@@ -1554,17 +2419,28 @@ const TripForm = ({
 
                             </SelectTrigger>
 
+
                             <SelectContent>
+
                                 {driversWithFallback.map(
                                     (driver) => (
+
                                         <SelectItem
-                                            key={driver.id}
-                                            value={normalizeId(driver.id)}
+                                            key={
+                                                driver.id
+                                            }
+                                            value={
+                                                normalizeId(
+                                                    driver.id
+                                                )
+                                            }
                                         >
                                             {driver.name}
                                         </SelectItem>
+
                                     )
                                 )}
+
                             </SelectContent>
 
                         </Select>
@@ -1587,14 +2463,16 @@ const TripForm = ({
 
                     <label className="form-label">
 
-                        {rentalType === "with_driver"
+                        {rentalType ===
+                        "with_driver"
                             ? "Pickup Location"
                             : "Pickup Branch"}
 
                     </label>
 
 
-                    {rentalType === "with_driver" ? (
+                    {rentalType ===
+                    "with_driver" ? (
 
                         <input
                             type="text"
@@ -1658,11 +2536,16 @@ const TripForm = ({
                                                 branch.id
                                             );
 
+
                                         return (
 
                                             <SelectItem
-                                                key={branchId}
-                                                value={branchId}
+                                                key={
+                                                    branchId
+                                                }
+                                                value={
+                                                    branchId
+                                                }
                                             >
                                                 {branch.name}
                                             </SelectItem>
@@ -1681,7 +2564,8 @@ const TripForm = ({
 
                     <p className="error-text">
 
-                        {rentalType === "with_driver"
+                        {rentalType ===
+                        "with_driver"
                             ? errors.pickup_location?.message
                             : errors.pickup_branch_id?.message}
 
@@ -1698,14 +2582,16 @@ const TripForm = ({
 
                     <label className="form-label">
 
-                        {rentalType === "with_driver"
+                        {rentalType ===
+                        "with_driver"
                             ? "Drop Location"
                             : "Drop Branch"}
 
                     </label>
 
 
-                    {rentalType === "with_driver" ? (
+                    {rentalType ===
+                    "with_driver" ? (
 
                         <input
                             type="text"
@@ -1769,11 +2655,16 @@ const TripForm = ({
                                                 branch.id
                                             );
 
+
                                         return (
 
                                             <SelectItem
-                                                key={branchId}
-                                                value={branchId}
+                                                key={
+                                                    branchId
+                                                }
+                                                value={
+                                                    branchId
+                                                }
                                             >
                                                 {branch.name}
                                             </SelectItem>
@@ -1792,7 +2683,8 @@ const TripForm = ({
 
                     <p className="error-text">
 
-                        {rentalType === "with_driver"
+                        {rentalType ===
+                        "with_driver"
                             ? errors.drop_location?.message
                             : errors.drop_branch_id?.message}
 
@@ -1811,11 +2703,15 @@ const TripForm = ({
                         Pickup Date &amp; Time
                     </label>
 
+
                     <input
                         type="datetime-local"
-                        {...register("pickup_at")}
+                        {...register(
+                            "pickup_at"
+                        )}
                         className="form-input"
                     />
+
 
                     <p className="error-text">
                         {errors.pickup_at?.message}
@@ -1834,6 +2730,7 @@ const TripForm = ({
                         Expected Return
                     </label>
 
+
                     <input
                         type="datetime-local"
                         {...register(
@@ -1841,6 +2738,7 @@ const TripForm = ({
                         )}
                         className="form-input"
                     />
+
 
                     <p className="error-text">
                         {
@@ -1887,11 +2785,14 @@ const TripForm = ({
                             "
                         >
 
+                            {/* PICKUP ODOMETER */}
+
                             <div>
 
                                 <label className="form-label">
                                     Pickup Odometer (km)
                                 </label>
+
 
                                 <input
                                     type="number"
@@ -1901,6 +2802,7 @@ const TripForm = ({
                                     )}
                                     className="form-input"
                                 />
+
 
                                 <p className="error-text">
                                     {
@@ -1913,11 +2815,14 @@ const TripForm = ({
                             </div>
 
 
+                            {/* RETURN ODOMETER */}
+
                             <div>
 
                                 <label className="form-label">
                                     Return Odometer (km)
                                 </label>
+
 
                                 <input
                                     type="number"
@@ -1928,6 +2833,7 @@ const TripForm = ({
                                     className="form-input"
                                     placeholder="Enter return odometer"
                                 />
+
 
                                 <p className="error-text">
                                     {
@@ -1940,11 +2846,14 @@ const TripForm = ({
                             </div>
 
 
+                            {/* PICKUP FUEL */}
+
                             <div>
 
                                 <label className="form-label">
                                     Pickup Fuel Level
                                 </label>
+
 
                                 <Select
                                     key={`
@@ -2015,7 +2924,8 @@ const TripForm = ({
 
                                 <p className="error-text">
                                     {
-                                        errors.pickup_fuel
+                                        errors
+                                            .pickup_fuel
                                             ?.message
                                     }
                                 </p>
@@ -2023,11 +2933,14 @@ const TripForm = ({
                             </div>
 
 
+                            {/* RETURN FUEL */}
+
                             <div>
 
                                 <label className="form-label">
                                     Return Fuel Level
                                 </label>
+
 
                                 <Select
                                     key={`
@@ -2098,7 +3011,8 @@ const TripForm = ({
 
                                 <p className="error-text">
                                     {
-                                        errors.return_fuel
+                                        errors
+                                            .return_fuel
                                             ?.message
                                     }
                                 </p>
@@ -2147,11 +3061,14 @@ const TripForm = ({
                             "
                         >
 
+                            {/* BASE AMOUNT */}
+
                             <div>
 
                                 <label className="form-label">
                                     Base Amount
                                 </label>
+
 
                                 <input
                                     type="number"
@@ -2163,9 +3080,11 @@ const TripForm = ({
                                     className="form-input"
                                 />
 
+
                                 <p className="error-text">
                                     {
-                                        errors.base_amount
+                                        errors
+                                            .base_amount
                                             ?.message
                                     }
                                 </p>
@@ -2173,11 +3092,14 @@ const TripForm = ({
                             </div>
 
 
+                            {/* EXTRA KM */}
+
                             <div>
 
                                 <label className="form-label">
                                     Extra KM Charge
                                 </label>
+
 
                                 <input
                                     type="number"
@@ -2190,6 +3112,7 @@ const TripForm = ({
                                     placeholder="0.00"
                                 />
 
+
                                 <p className="error-text">
                                     {
                                         errors
@@ -2201,11 +3124,14 @@ const TripForm = ({
                             </div>
 
 
+                            {/* LATE RETURN */}
+
                             <div>
 
                                 <label className="form-label">
                                     Late Return Charge
                                 </label>
+
 
                                 <input
                                     type="number"
@@ -2218,6 +3144,7 @@ const TripForm = ({
                                     placeholder="0.00"
                                 />
 
+
                                 <p className="error-text">
                                     {
                                         errors
@@ -2229,11 +3156,14 @@ const TripForm = ({
                             </div>
 
 
+                            {/* DAMAGE */}
+
                             <div>
 
                                 <label className="form-label">
                                     Damage Charge
                                 </label>
+
 
                                 <input
                                     type="number"
@@ -2246,6 +3176,7 @@ const TripForm = ({
                                     placeholder="0.00"
                                 />
 
+
                                 <p className="error-text">
                                     {
                                         errors
@@ -2257,11 +3188,14 @@ const TripForm = ({
                             </div>
 
 
+                            {/* FUEL */}
+
                             <div>
 
                                 <label className="form-label">
                                     Fuel Charge
                                 </label>
+
 
                                 <input
                                     type="number"
@@ -2273,6 +3207,7 @@ const TripForm = ({
                                     className="form-input"
                                     placeholder="0.00"
                                 />
+
 
                                 <p className="error-text">
                                     {
@@ -2286,6 +3221,8 @@ const TripForm = ({
 
                         </div>
 
+
+                        {/* TOTAL */}
 
                         <div
                             className="
@@ -2318,7 +3255,9 @@ const TripForm = ({
                                     text-gray-800
                                 "
                             >
+
                                 Rs.{" "}
+
                                 {totalAmount.toLocaleString(
                                     "en-IN",
                                     {
@@ -2326,6 +3265,7 @@ const TripForm = ({
                                         maximumFractionDigits: 2,
                                     }
                                 )}
+
                             </span>
 
                         </div>
@@ -2345,6 +3285,7 @@ const TripForm = ({
                         Pickup Notes
                     </label>
 
+
                     <textarea
                         {...register(
                             "pickup_notes"
@@ -2354,12 +3295,17 @@ const TripForm = ({
                             form-input
                             resize-none
                         "
-                        placeholder="Optional notes about vehicle condition at pickup"
+                        placeholder="
+                            Optional notes about vehicle
+                            condition at pickup
+                        "
                     />
+
 
                     <p className="error-text">
                         {
-                            errors.pickup_notes
+                            errors
+                                .pickup_notes
                                 ?.message
                         }
                     </p>
@@ -2431,7 +3377,9 @@ const TripForm = ({
             </div>
 
         </form>
+
     );
+
 };
 
 

@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import {
+    useSearchParams,
+    useNavigate,
+} from "react-router-dom";
 
 import { usePayments } from "../hooks/usePayments";
 import { PaymentColumns } from "../components/PaymentColumns";
-import { PaymentTable } from "../components/PaymentTable";
+import PaymentTable from "../components/PaymentTable";
 
 const SUBMENU_TITLES = {
     "": "All Payments",
@@ -16,9 +19,11 @@ const SUBMENU_TITLES = {
 export const PaymentListPage = () => {
 
     const [searchParams] = useSearchParams();
+
     const navigate = useNavigate();
 
-    const typeParam = searchParams.get("type") || "";
+    const typeParam =
+        searchParams.get("type") || "";
 
     const [filters, setFilters] = useState({
         status: "",
@@ -33,11 +38,14 @@ export const PaymentListPage = () => {
     */
 
     useEffect(() => {
+
         setFilters((prev) => ({
             ...prev,
             type: typeParam,
         }));
+
     }, [typeParam]);
+
 
     /*
     |--------------------------------------------------------------------------
@@ -50,18 +58,25 @@ export const PaymentListPage = () => {
         isLoading,
     } = usePayments(filters);
 
+
     /*
     |--------------------------------------------------------------------------
     | Filter Change
     |--------------------------------------------------------------------------
     */
 
-    const handleFilterChange = (key, value) => {
+    const handleFilterChange = (
+        key,
+        value
+    ) => {
+
         setFilters((prev) => ({
             ...prev,
             [key]: value,
         }));
+
     };
+
 
     /*
     |--------------------------------------------------------------------------
@@ -72,12 +87,46 @@ export const PaymentListPage = () => {
     const handleView = (payment) => {
 
         if (!payment?.slug) {
-            console.error("Payment slug not found:", payment);
+
+            console.error(
+                "Payment slug not found:",
+                payment
+            );
+
             return;
         }
 
-        navigate(`/payments/${payment.slug}`);
+        navigate(
+            `/payments/${payment.slug}`
+        );
+
     };
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Payment Receipt
+    |--------------------------------------------------------------------------
+    */
+
+    const handleReceipt = (payment) => {
+
+        if (!payment?.slug) {
+
+            console.error(
+                "Payment slug not found:",
+                payment
+            );
+
+            return;
+        }
+
+        navigate(
+            `/payments/${payment.slug}/receipt`
+        );
+
+    };
+
 
     /*
     |--------------------------------------------------------------------------
@@ -86,8 +135,15 @@ export const PaymentListPage = () => {
     */
 
     const columns = PaymentColumns({
+
         onView: handleView,
+
+        onReceipt: handleReceipt,
+
+        showActions: true,
+
     });
+
 
     /*
     |--------------------------------------------------------------------------
@@ -96,7 +152,21 @@ export const PaymentListPage = () => {
     */
 
     const pageTitle =
-        SUBMENU_TITLES[typeParam] ?? "Payments";
+        SUBMENU_TITLES[typeParam] ??
+        "Payments";
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Data
+    |--------------------------------------------------------------------------
+    */
+
+    const payments =
+        data?.data ??
+        data ??
+        [];
+
 
     /*
     |--------------------------------------------------------------------------
@@ -107,7 +177,9 @@ export const PaymentListPage = () => {
     return (
         <div className="space-y-4">
 
+            {/* ============================================================ */}
             {/* PAGE HEADER */}
+            {/* ============================================================ */}
 
             <div className="flex items-center justify-between">
 
@@ -118,7 +190,9 @@ export const PaymentListPage = () => {
             </div>
 
 
+            {/* ============================================================ */}
             {/* FILTERS */}
+            {/* ============================================================ */}
 
             <div className="flex flex-wrap gap-3">
 
@@ -134,6 +208,7 @@ export const PaymentListPage = () => {
                         )
                     }
                 >
+
                     <option value="">
                         All Statuses
                     </option>
@@ -153,6 +228,7 @@ export const PaymentListPage = () => {
                     <option value="refunded">
                         Refunded
                     </option>
+
                 </select>
 
 
@@ -168,6 +244,7 @@ export const PaymentListPage = () => {
                         )
                     }
                 >
+
                     <option value="">
                         All Types
                     </option>
@@ -191,6 +268,7 @@ export const PaymentListPage = () => {
                     <option value="refund">
                         Refund
                     </option>
+
                 </select>
 
 
@@ -198,7 +276,9 @@ export const PaymentListPage = () => {
 
                 <select
                     className="form-input w-40"
-                    value={filters.payment_method}
+                    value={
+                        filters.payment_method
+                    }
                     onChange={(e) =>
                         handleFilterChange(
                             "payment_method",
@@ -206,6 +286,7 @@ export const PaymentListPage = () => {
                         )
                     }
                 >
+
                     <option value="">
                         All Methods
                     </option>
@@ -229,15 +310,18 @@ export const PaymentListPage = () => {
                     <option value="khalti">
                         Khalti
                     </option>
+
                 </select>
 
             </div>
 
 
+            {/* ============================================================ */}
             {/* PAYMENT TABLE */}
+            {/* ============================================================ */}
 
             <PaymentTable
-                data={data?.data ?? data ?? []}
+                data={payments}
                 columns={columns}
                 isLoading={isLoading}
             />

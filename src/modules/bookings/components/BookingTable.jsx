@@ -48,7 +48,7 @@ const BookingTable = ({
                     value={globalFilter ?? ""}
                     onChange={(e) => setGlobalFilter(e.target.value)}
                     placeholder="Search trips..."
-                    className="border rounded-lg px-4 py-2 w-full bg-white md:w-96"
+                    className="border rounded-lg px-4 py-2 w-full bg-white md:w-72"
                 />
 
                 {toolbarRight}

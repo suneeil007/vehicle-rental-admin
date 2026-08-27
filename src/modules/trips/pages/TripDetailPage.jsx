@@ -113,6 +113,12 @@ const TripDetailPage = () => {
     const canComplete = trip.status === "on_trip";
     const canGenerateInvoice = trip.status === "completed";
 
+
+    console.log("TRIP:", trip);
+console.log("TRIP STATUS:", trip.status);
+console.log("VEHICLE:", trip.vehicle);
+console.log("VEHICLE STATUS:", trip.vehicle?.status);
+
     const formatAmount = (amount) =>
         Number(amount ?? 0).toLocaleString("en-IN", {
             minimumFractionDigits: 2,

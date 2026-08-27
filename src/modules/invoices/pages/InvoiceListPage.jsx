@@ -2,59 +2,115 @@ import { useNavigate } from "react-router-dom";
 
 import { useInvoices } from "../hooks/useInvoices";
 import { InvoiceColumns } from "../components/InvoiceColumns";
-import { InvoiceTable } from "../components/InvoiceTable";
+import InvoiceTable from "../components/InvoiceTable";
+
 
 export const InvoiceListPage = () => {
 
     const navigate = useNavigate();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Invoices
+    |--------------------------------------------------------------------------
+    */
 
     const {
         data,
         isLoading,
     } = useInvoices();
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | View Invoice
+    |--------------------------------------------------------------------------
+    */
+
+    const handleView = (invoice) => {
+
+        if (!invoice?.slug) {
+
+            console.error(
+                "Invoice slug not found:",
+                invoice
+            );
+
+            return;
+        }
+
+        navigate(
+            `/invoices/${invoice.slug}`
+        );
+    };
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Payment Receipt
+    |--------------------------------------------------------------------------
+    */
+
+    const handleReceipt = (payment) => {
+
+        if (!payment?.slug) {
+
+            console.error(
+                "Payment slug not found:",
+                payment
+            );
+
+            return;
+        }
+
+        navigate(
+            `/payments/${payment.slug}/receipt`
+        );
+    };
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Columns
+    |--------------------------------------------------------------------------
+    */
+
     const columns = InvoiceColumns({
 
-        /*
-        |--------------------------------------------------------------------------
-        | View Invoice
-        |--------------------------------------------------------------------------
-        */
+        onView: handleView,
 
-        onView: (invoice) => {
+        onReceipt: handleReceipt,
 
-            navigate(
-                `/invoices/${invoice.slug}`
-            );
-        },
-
-        /*
-        |--------------------------------------------------------------------------
-        | Payment Receipt
-        |--------------------------------------------------------------------------
-        */
-
-        onReceipt: (payment) => {
-
-            if (!payment?.slug) {
-                console.error(
-                    "Payment slug is missing:",
-                    payment
-                );
-
-                return;
-            }
-
-            navigate(
-                `/payments/${payment.slug}/receipt`
-            );
-        },
     });
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Data
+    |--------------------------------------------------------------------------
+    */
+
+    const invoices =
+        data?.data ??
+        data ??
+        [];
+
+
     return (
+
         <div className="space-y-4">
 
-            <div className="flex items-center justify-between">
+
+            {/* PAGE HEADER */}
+
+            <div
+                className="
+                    flex
+                    items-center
+                    justify-between
+                "
+            >
 
                 <h1 className="text-xl font-semibold">
                     Invoices
@@ -62,12 +118,11 @@ export const InvoiceListPage = () => {
 
             </div>
 
+
+            {/* TABLE */}
+
             <InvoiceTable
-                data={
-                    data?.data ??
-                    data ??
-                    []
-                }
+                data={invoices}
                 columns={columns}
                 isLoading={isLoading}
             />
@@ -75,5 +130,6 @@ export const InvoiceListPage = () => {
         </div>
     );
 };
+
 
 export default InvoiceListPage;

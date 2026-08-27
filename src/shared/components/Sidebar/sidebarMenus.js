@@ -15,6 +15,21 @@ export const menus = [
     },
 
     {
+        title: "User Management",
+        icon: Users,
+        children: [
+            {
+                title: "Users",
+                path: "/users",
+            },
+            {
+                title: "Roles",
+                path: "/roles",
+            },
+        ],
+    },
+
+    {
         title: "Vehicle Management",
         icon: Car,
         children: [
@@ -40,21 +55,6 @@ export const menus = [
             {
                 title: "Trips",
                 path: "/trips",
-            },
-        ],
-    },
-
-    {
-        title: "User Management",
-        icon: Users,
-        children: [
-            {
-                title: "Users",
-                path: "/users",
-            },
-            {
-                title: "Roles",
-                path: "/roles",
             },
         ],
     },
